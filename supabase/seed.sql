@@ -1,0 +1,2 @@
+-- Seed data for development
+-- This file runs after migrations via: npx supabase db reset
