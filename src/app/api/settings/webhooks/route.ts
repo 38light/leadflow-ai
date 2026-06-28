@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { getAPIContext } from "@/lib/auth/get-user";
-import { assertSafeFetchUrl } from "@/lib/security/safe-url";
+import { assertSafeWebhookUrl } from "@/lib/webhooks/ssrf-guard";
 import { nanoid } from "nanoid";
 
 // GET /api/settings/webhooks — list user's webhook endpoints (secret masked)
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
   }
   // SSRF guard: reject private/reserved/metadata destinations at registration time.
   try {
-    await assertSafeFetchUrl(url);
+    await assertSafeWebhookUrl(url);
   } catch {
     return NextResponse.json(
       { error: "URL must be a public https endpoint (private/reserved addresses are not allowed)" },

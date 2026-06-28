@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { assertSafeFetchUrl } from "@/lib/security/safe-url";
+import { assertSafeWebhookUrl } from "@/lib/webhooks/ssrf-guard";
 
 export interface WebhookPayload {
   event: string;
@@ -38,8 +38,9 @@ export async function deliverWebhookEvent(
       endpoints.map(async (endpoint: { id: string; url: string; secret: string; failure_count: number }) => {
         try {
           // SSRF guard: refuse to fetch private/reserved/metadata destinations.
-          // A throw here is caught below and counts as a delivery failure.
-          await assertSafeFetchUrl(endpoint.url);
+          // Re-checked here (not just at registration) to defend against DNS
+          // rebinding. A throw is caught below and counts as a delivery failure.
+          await assertSafeWebhookUrl(endpoint.url);
 
           // Sign with HMAC-SHA256
           const digest = crypto
@@ -55,6 +56,10 @@ export async function deliverWebhookEvent(
           try {
             const res = await fetch(endpoint.url, {
               method: "POST",
+              // Do NOT follow redirects: a public URL could 30x to a private
+              // target, bypassing the SSRF guard above. A 3xx becomes an
+              // opaque response (res.ok === false) → counts as a failed delivery.
+              redirect: "manual",
               headers: {
                 "Content-Type": "application/json",
                 "X-LeadFlow-Signature": `sha256=${digest}`,
