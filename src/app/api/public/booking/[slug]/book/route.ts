@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createBookingSchema } from "@/lib/validators/booking";
+import { rateLimitByIp } from "@/lib/rate-limit/chat";
 
 // POST /api/public/booking/[slug]/book — public booking creation
 // Validates input, checks slot availability (race condition guard), creates booking
@@ -9,6 +10,15 @@ export async function POST(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
+
+  // Public + unauthenticated: throttle per IP to prevent booking spam / calendar DoS.
+  const rl = await rateLimitByIp(request, "booking:create", 10, 3600);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many booking attempts. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(Math.max(0, rl.reset - Math.floor(Date.now() / 1000))) } }
+    );
+  }
 
   let body;
   try {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase/server";
+import { createServerClient, createAdminClient } from "@/lib/supabase/server";
 import { getAPIContext } from "@/lib/auth/get-user";
 import { updateBookingSchema } from "@/lib/validators/booking";
 import { deliverWebhookEvent } from "@/lib/webhooks/deliver";
@@ -138,9 +138,10 @@ export async function PUT(
         contactId = c?.id ?? null;
       }
 
-      // Create follow-up task as a notification
+      // Create follow-up task as a notification via the service-role client
+      // (user_id is the owner, which differs from auth.uid() for a team member).
       const contactLink = contactId ? `/contacts/${contactId}` : `/bookings`;
-      await supabase.from("notifications").insert({
+      await createAdminClient().from("notifications").insert({
         user_id: ctx.ownerId,
         type: "follow_up_task",
         title: `Follow up with ${data.client_name}`,

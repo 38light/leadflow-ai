@@ -55,13 +55,31 @@ async function checkRateLimit(
   return { allowed: success, remaining, reset };
 }
 
-export async function rateLimitChatInit(req: NextRequest): Promise<RateLimitResult> {
-  const ip =
+/** Best-effort client IP from proxy headers (Vercel sets x-forwarded-for). */
+export function getClientIp(req: NextRequest): string {
+  return (
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     req.headers.get("x-real-ip") ??
-    "unknown";
+    "unknown"
+  );
+}
 
-  return checkRateLimit(`chat:init:${ip}`, 10, 60);
+/**
+ * Generic per-IP rate limiter for public, unauthenticated endpoints.
+ * `bucket` namespaces the limit (e.g. "booking:create"). Degrades to allow-all
+ * when Upstash is not configured.
+ */
+export async function rateLimitByIp(
+  req: NextRequest,
+  bucket: string,
+  limit: number,
+  windowSeconds: number
+): Promise<RateLimitResult> {
+  return checkRateLimit(`${bucket}:${getClientIp(req)}`, limit, windowSeconds);
+}
+
+export async function rateLimitChatInit(req: NextRequest): Promise<RateLimitResult> {
+  return checkRateLimit(`chat:init:${getClientIp(req)}`, 10, 60);
 }
 
 export async function rateLimitChatMessage(sessionId: string): Promise<RateLimitResult> {

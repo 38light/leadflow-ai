@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { findOrCreateContact } from "@/lib/contacts/find-or-create";
 import { findOrCreateWebChatConversation } from "@/lib/conversations/find-or-create";
 import { processInboundMessage } from "@/lib/ai/orchestrator";
-import { rateLimitChatMessage } from "@/lib/rate-limit/chat";
+import { rateLimitChatMessage, rateLimitByIp } from "@/lib/rate-limit/chat";
 
 /**
  * POST /api/chat/message
@@ -38,13 +38,17 @@ export async function POST(request: NextRequest) {
 
     const { sessionId, content, businessId, senderName, senderEmail, senderPhone } = parsed.data;
 
+    // Per-IP cap first — sessionId is attacker-chosen and rotatable, so the
+    // per-session limit alone does not bound AI cost / DB-write abuse.
+    const ipRl = await rateLimitByIp(request, "chat:msg:ip", 60, 60);
     const rl = await rateLimitChatMessage(sessionId);
-    if (!rl.allowed) {
+    if (!ipRl.allowed || !rl.allowed) {
+      const reset = Math.max(ipRl.reset, rl.reset);
       return NextResponse.json(
         { error: "Message limit reached. Please wait before sending more messages." },
         {
           status: 429,
-          headers: { "Retry-After": String(Math.max(0, rl.reset - Math.floor(Date.now() / 1000))) },
+          headers: { "Retry-After": String(Math.max(0, reset - Math.floor(Date.now() / 1000))) },
         }
       );
     }

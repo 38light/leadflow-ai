@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAPIContext } from "@/lib/auth/get-user";
-import { createServerClient } from "@/lib/supabase/server";
+import { createServerClient, createAdminClient } from "@/lib/supabase/server";
 
 interface TriggerBody {
   contactId: string;
@@ -57,8 +57,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Contact not found" }, { status: 404 });
   }
 
-  // Insert a follow-up notification record (notifications schema: user_id, type, title, body, link, read)
-  const { error: notifError } = await supabase
+  // Insert a follow-up notification record via the service-role client (user_id
+  // is the owner, which differs from auth.uid() for a team member).
+  const { error: notifError } = await createAdminClient()
     .from("notifications")
     .insert({
       user_id: ownerId,

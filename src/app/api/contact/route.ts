@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { rateLimitByIp } from "@/lib/rate-limit/chat";
 
 const contactSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -10,6 +11,15 @@ const contactSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // Public + unauthenticated: throttle per IP to protect the Resend quota / inbox.
+    const rl = await rateLimitByIp(request, "contact:form", 5, 3600);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(Math.max(0, rl.reset - Math.floor(Date.now() / 1000))) } }
+      );
+    }
+
     let body: unknown;
     try {
       body = await request.json();

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase/server";
+import { createServerClient, createAdminClient } from "@/lib/supabase/server";
 import { getAPIContext } from "@/lib/auth/get-user";
 
 export async function POST(
@@ -95,10 +95,12 @@ export async function POST(
       read: false,
     }));
 
-    // Insert in batches of 100 to avoid request size limits
+    // Insert via the service-role client: notifications.user_id is the owner,
+    // which may differ from auth.uid() for a team member sending the broadcast.
+    const adminClient = createAdminClient();
     for (let i = 0; i < notifications.length; i += 100) {
       const batch = notifications.slice(i, i + 100);
-      await supabase.from("notifications").insert(batch);
+      await adminClient.from("notifications").insert(batch);
     }
   }
 
