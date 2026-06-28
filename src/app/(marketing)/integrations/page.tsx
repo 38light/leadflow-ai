@@ -3,6 +3,7 @@ import {
   MessageCircle, Instagram, Smartphone, Phone, Globe,
   RefreshCw, Calendar, CreditCard, Mail, Database, Zap,
 } from "lucide-react";
+import { SectionHeroDark, ScrollReveal, SpotlightCard } from "@/components/marketing";
 
 const channels = [
   {
@@ -108,45 +109,50 @@ const integrations = [
 
 export default function IntegrationsPage() {
   return (
-    <div className="py-20">
+    <div>
       {/* Hero */}
-      <div className="max-w-4xl mx-auto text-center px-4 mb-16">
-        <h1 className="text-4xl md:text-5xl font-bold mb-6">
-          Connects to{" "}
-          <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            everything you use
-          </span>
-        </h1>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          LeadFlow AI integrates with your messaging channels, CRM, calendar,
-          and payment processor — all working together seamlessly.
-        </p>
-      </div>
+      <SectionHeroDark
+        eyebrow="Integrations"
+        title={
+          <>
+            One platform.{" "}
+            <span className="bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent">
+              Every tool
+            </span>{" "}
+            you use.
+          </>
+        }
+        subtitle="LeadFlow AI integrates with your messaging channels, CRM, calendar, and payment processor — all working together seamlessly."
+      />
 
       {/* Channels Section */}
-      <div className="max-w-6xl mx-auto px-4 mb-20">
+      <div className="max-w-6xl mx-auto px-4 py-20">
         <h2 className="text-2xl font-bold mb-2">Messaging Channels</h2>
         <p className="text-gray-500 mb-8">Capture leads from every platform your clients use.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {channels.map((channel) => {
+          {channels.map((channel, i) => {
             const Icon = channel.icon;
             return (
-              <div key={channel.name} className="bg-white border rounded-2xl p-8 hover:shadow-lg transition-shadow">
-                <div className={`w-12 h-12 rounded-xl ${channel.color} flex items-center justify-center mb-5`}>
-                  <Icon className="w-6 h-6" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">{channel.name}</h3>
-                <p className="text-gray-600 text-sm mb-4">{channel.description}</p>
-                <ul className="space-y-1.5 mb-4">
-                  {channel.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm text-gray-500">
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-xs text-blue-600 font-medium">{channel.setup}</p>
-              </div>
+              <ScrollReveal key={channel.name} delay={i * 60}>
+                <SpotlightCard className="h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_0_1px_rgba(34,211,238,0.5),0_20px_60px_-10px_rgba(34,211,238,0.35)]">
+                  <div className="p-8">
+                    <div className={`w-12 h-12 rounded-xl ${channel.color} flex items-center justify-center mb-5`}>
+                      <Icon className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2 text-white">{channel.name}</h3>
+                    <p className="text-slate-300 text-sm mb-4">{channel.description}</p>
+                    <ul className="space-y-1.5 mb-4">
+                      {channel.features.map((f) => (
+                        <li key={f} className="flex items-center gap-2 text-sm text-slate-400">
+                          <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-cyan-400 font-medium">{channel.setup}</p>
+                  </div>
+                </SpotlightCard>
+              </ScrollReveal>
             );
           })}
         </div>
@@ -158,29 +164,33 @@ export default function IntegrationsPage() {
           <h2 className="text-2xl font-bold mb-2">Platform Integrations</h2>
           <p className="text-gray-500 mb-8">Connect your existing tools and let AI bridge the gaps.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {integrations.map((integration) => {
+            {integrations.map((integration, i) => {
               const Icon = integration.icon;
               return (
-                <div key={integration.name} className="bg-white border rounded-2xl p-8 hover:shadow-lg transition-shadow">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className={`w-10 h-10 rounded-lg ${integration.color} flex items-center justify-center`}>
-                      <Icon className="w-5 h-5" />
+                <ScrollReveal key={integration.name} delay={i * 60}>
+                  <SpotlightCard className="h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_0_1px_rgba(34,211,238,0.5),0_20px_60px_-10px_rgba(34,211,238,0.35)]">
+                    <div className="p-8">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className={`w-10 h-10 rounded-lg ${integration.color} flex items-center justify-center`}>
+                          <Icon className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-white">{integration.name}</h3>
+                          <span className="text-xs text-slate-400">{integration.category}</span>
+                        </div>
+                      </div>
+                      <p className="text-slate-300 text-sm mb-4">{integration.description}</p>
+                      <ul className="space-y-1.5">
+                        {integration.features.map((f) => (
+                          <li key={f} className="flex items-center gap-2 text-sm text-slate-400">
+                            <div className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+                            {f}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                    <div>
-                      <h3 className="font-semibold">{integration.name}</h3>
-                      <span className="text-xs text-gray-400">{integration.category}</span>
-                    </div>
-                  </div>
-                  <p className="text-gray-600 text-sm mb-4">{integration.description}</p>
-                  <ul className="space-y-1.5">
-                    {integration.features.map((f) => (
-                      <li key={f} className="flex items-center gap-2 text-sm text-gray-500">
-                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                  </SpotlightCard>
+                </ScrollReveal>
               );
             })}
           </div>

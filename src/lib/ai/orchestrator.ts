@@ -27,10 +27,95 @@ export interface ProcessMessageResult {
   isOptOut: boolean;
   intent: string;
   sentiment: string;
+  language: string;
+  confidence: number;
+  queuedForApproval: boolean;
+  approvalId: string | null;
   toolsCalled: Array<{ toolName: string; toolInput: Record<string, unknown>; result: unknown }>;
   totalInputTokens: number;
   totalOutputTokens: number;
   totalLatencyMs: number;
+}
+
+interface ProfileQualityFields {
+  ai_confidence_threshold: number | null;
+  require_approval: boolean | null;
+  ai_memory_depth: number | null;
+  default_language: string | null;
+}
+
+async function loadProfileQualitySettings(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<ProfileQualityFields> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("ai_confidence_threshold, require_approval, ai_memory_depth, default_language")
+    .eq("user_id", userId)
+    .single();
+
+  const profile = (data ?? null) as ProfileQualityFields | null;
+  return {
+    ai_confidence_threshold: profile?.ai_confidence_threshold ?? 0,
+    require_approval: profile?.require_approval ?? false,
+    ai_memory_depth: profile?.ai_memory_depth ?? 3,
+    default_language: profile?.default_language ?? "en",
+  };
+}
+
+async function buildPriorContext(
+  supabase: SupabaseClient,
+  userId: string,
+  contactId: string,
+  currentConversationId: string,
+  depth: number
+): Promise<string | null> {
+  if (!depth || depth <= 0) return null;
+
+  const { data: priorConversations } = await supabase
+    .from("conversations")
+    .select("id, summary, sentiment, intent, status, last_message_at, created_at")
+    .eq("user_id", userId)
+    .eq("contact_id", contactId)
+    .neq("id", currentConversationId)
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .limit(depth);
+
+  const rows = (priorConversations ?? []) as Array<{
+    id: string;
+    summary: string | null;
+    sentiment: string | null;
+    intent: string | null;
+    status: string | null;
+    last_message_at: string | null;
+    created_at: string;
+  }>;
+
+  if (rows.length === 0) return null;
+
+  // Get message counts for each prior conversation in one round trip is non-trivial here;
+  // do per-conversation count queries (depth is small — defaults to 3, max 10).
+  const summaries: string[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const c = rows[i];
+    const { count } = await supabase
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .eq("conversation_id", c.id)
+      .eq("user_id", userId);
+
+    const dateStr = c.last_message_at ?? c.created_at;
+    const when = dateStr ? new Date(dateStr).toISOString().slice(0, 10) : "unknown";
+    const summaryText = c.summary && c.summary.trim().length > 0
+      ? c.summary.trim()
+      : "(no summary recorded)";
+
+    summaries.push(
+      `${i + 1}. [${when}] ${count ?? 0} msg, intent=${c.intent ?? "?"}, sentiment=${c.sentiment ?? "?"}, outcome=${c.status ?? "?"}\n   ${summaryText}`
+    );
+  }
+
+  return summaries.join("\n");
 }
 
 export async function processInboundMessage(params: ProcessMessageParams): Promise<ProcessMessageResult> {
@@ -62,12 +147,26 @@ export async function processInboundMessage(params: ProcessMessageParams): Promi
       isOptOut: true,
       intent: "opt_out",
       sentiment: "neutral",
+      language: "en",
+      confidence: 1,
+      queuedForApproval: false,
+      approvalId: null,
       toolsCalled: [],
       totalInputTokens: 0,
       totalOutputTokens: 0,
       totalLatencyMs: 0,
     };
   }
+
+  // Load AI quality settings + prior conversation context for this contact
+  const qualitySettings = await loadProfileQualitySettings(supabase, userId);
+  const priorContext = await buildPriorContext(
+    supabase,
+    userId,
+    contactId,
+    conversationId,
+    qualitySettings.ai_memory_depth ?? 3
+  );
 
   // Build Claude message history
   const claudeMessages: Anthropic.MessageParam[] = conversationHistory.map((msg) => ({
@@ -78,8 +177,17 @@ export async function processInboundMessage(params: ProcessMessageParams): Promi
   // Add the current inbound message
   claudeMessages.push({ role: "user", content: inboundContent });
 
-  // Step 1: Concierge — classify intent, sentiment, routing
-  const conciergeResult = await runConcierge(claudeMessages, businessName, businessType, model);
+  // Step 1: Concierge — classify intent, sentiment, language, confidence, routing
+  const conciergeResult = await runConcierge(
+    claudeMessages,
+    businessName,
+    businessType,
+    model,
+    {
+      priorContext,
+      defaultLanguage: qualitySettings.default_language,
+    }
+  );
   const { decision } = conciergeResult;
   totalInputTokens += conciergeResult.inputTokens;
   totalOutputTokens += conciergeResult.outputTokens;
@@ -172,6 +280,42 @@ export async function processInboundMessage(params: ProcessMessageParams): Promi
     inboundContent,
   });
 
+  // Determine whether the draft must be queued for human approval
+  const threshold = qualitySettings.ai_confidence_threshold ?? 0;
+  const requireApproval = qualitySettings.require_approval === true;
+  const belowThreshold = decision.confidence < threshold;
+  const needsApproval =
+    !composed.isOptOut &&
+    decision.routing !== "human_handoff" &&
+    (requireApproval || belowThreshold);
+
+  let approvalId: string | null = null;
+  let shouldSend = composed.shouldSend;
+
+  if (needsApproval) {
+    const { data: approvalRow, error: approvalError } = await supabase
+      .from("ai_approvals")
+      .insert({
+        user_id: userId,
+        conversation_id: conversationId,
+        contact_id: contactId,
+        draft_content: composed.content,
+        confidence: decision.confidence,
+        reasoning: decision.reasoning,
+        status: "pending",
+      })
+      .select("id")
+      .single();
+
+    if (approvalError) {
+      console.error("[Orchestrator] Failed to create approval record:", approvalError);
+    } else if (approvalRow) {
+      approvalId = (approvalRow as { id: string }).id;
+    }
+
+    shouldSend = false;
+  }
+
   // Log AI interaction (non-blocking)
   const { error: logError } = await supabase.from("ai_interaction_logs").insert({
     user_id: userId,
@@ -191,10 +335,14 @@ export async function processInboundMessage(params: ProcessMessageParams): Promi
 
   return {
     responseContent: composed.content,
-    shouldSend: composed.shouldSend,
+    shouldSend,
     isOptOut: composed.isOptOut,
     intent: decision.intent,
     sentiment: decision.sentiment,
+    language: decision.language,
+    confidence: decision.confidence,
+    queuedForApproval: needsApproval,
+    approvalId,
     toolsCalled,
     totalInputTokens,
     totalOutputTokens,

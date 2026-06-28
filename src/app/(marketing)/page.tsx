@@ -6,144 +6,40 @@ import {
   Calendar,
   CreditCard,
   RefreshCw,
-  MessageSquare,
-  Phone,
-  Globe,
   Star,
   ChevronDown,
   ArrowRight,
-  Zap,
-
   Brain,
   Target,
   Users,
   CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HeroAI, StatTicker, AgentFlow } from "@/components/marketing";
 
 /* ------------------------------------------------------------------ */
-/*  Hero                                                               */
+/*  Stats band (dark, continues hero theme)                            */
 /* ------------------------------------------------------------------ */
 
-function Hero() {
+function StatsBand() {
   return (
-    <section
-      id="hero"
-      className="relative overflow-hidden bg-gradient-to-b from-blue-50 via-blue-50/40 to-white"
-    >
-      {/* Decorative blobs */}
-      <div className="pointer-events-none absolute -top-40 -right-40 h-[500px] w-[500px] rounded-full bg-purple-200/30 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-60 -left-40 h-[500px] w-[500px] rounded-full bg-blue-200/20 blur-3xl" />
-
-      <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32 lg:px-8 lg:py-40">
-        <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-          {/* Copy */}
-          <div className="max-w-2xl">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/80 px-4 py-1.5 text-sm font-medium text-blue-700 backdrop-blur">
-              <Zap className="h-4 w-4" />
-              AI-powered lead conversion
-            </div>
-            <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl">
-              Your AI Chief of Staff for{" "}
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Lead Conversion
-              </span>
-            </h1>
-            <p className="mt-6 text-lg leading-relaxed text-gray-600 sm:text-xl">
-              Capture, qualify, and convert leads across every channel —
-              WhatsApp, Instagram, SMS, Voice, and Web Chat. Your AI never
-              sleeps, never misses a lead, and responds in under 15 seconds.
-            </p>
-
-            <div className="mt-10 flex flex-wrap items-center gap-4">
-              <Link
-                href="/register"
-                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-4 text-lg font-semibold text-white shadow-lg shadow-blue-500/25 transition hover:shadow-xl hover:shadow-blue-500/30 hover:brightness-110"
-              >
-                Start Free Trial
-                <ArrowRight className="h-5 w-5" />
-              </Link>
-              <Link
-                href="#how-it-works"
-                className="inline-flex items-center gap-2 rounded-xl border-2 border-gray-300 px-8 py-4 text-lg font-semibold text-gray-700 transition hover:border-gray-400 hover:bg-gray-50"
-              >
-                Watch Demo
-              </Link>
-            </div>
-
-            <p className="mt-5 text-sm text-gray-500">
-              No credit card required &middot; Free 14-day trial &middot;
-              Cancel anytime
-            </p>
-          </div>
-
-          {/* Chat mockup */}
-          <div className="relative mx-auto w-full max-w-md lg:mx-0">
-            <div className="rounded-2xl border border-gray-200 bg-white shadow-2xl shadow-gray-200/60">
-              {/* Title bar */}
-              <div className="flex items-center gap-3 rounded-t-2xl border-b border-gray-100 bg-gray-50 px-5 py-3">
-                <div className="flex gap-1.5">
-                  <span className="h-3 w-3 rounded-full bg-red-400" />
-                  <span className="h-3 w-3 rounded-full bg-yellow-400" />
-                  <span className="h-3 w-3 rounded-full bg-green-400" />
-                </div>
-                <span className="text-sm font-medium text-gray-500">
-                  LeadFlow AI — Inbox
-                </span>
-              </div>
-
-              <div className="space-y-4 p-5">
-                {/* Lead message */}
-                <div className="flex justify-start">
-                  <div className="max-w-[75%] rounded-2xl rounded-tl-sm bg-gray-100 px-4 py-3 text-sm text-gray-800">
-                    Hi! Are you available for a wedding on Oct 12?
-                  </div>
-                </div>
-                {/* AI response */}
-                <div className="flex justify-end">
-                  <div className="max-w-[75%] rounded-2xl rounded-tr-sm bg-gradient-to-br from-blue-600 to-purple-600 px-4 py-3 text-sm text-white">
-                    Hi! I&apos;m Sarah&apos;s AI assistant. Let me
-                    check&hellip; Sarah is free on Oct 12! Want the brochure?
-                  </div>
-                </div>
-                {/* Lead */}
-                <div className="flex justify-start">
-                  <div className="max-w-[75%] rounded-2xl rounded-tl-sm bg-gray-100 px-4 py-3 text-sm text-gray-800">
-                    Yes please! How do I book?
-                  </div>
-                </div>
-                {/* AI */}
-                <div className="flex justify-end">
-                  <div className="max-w-[75%] rounded-2xl rounded-tr-sm bg-gradient-to-br from-blue-600 to-purple-600 px-4 py-3 text-sm text-white">
-                    Here&apos;s a $200 deposit link to lock in the date:{" "}
-                    <span className="inline-block mt-1 rounded-lg bg-white/20 px-3 py-1 font-medium">
-                      Pay Now &rarr;
-                    </span>
-                  </div>
-                </div>
-                {/* Typing indicator */}
-                <div className="flex justify-end">
-                  <div className="flex items-center gap-1 rounded-2xl rounded-tr-sm bg-gradient-to-br from-blue-600 to-purple-600 px-4 py-3">
-                    <span className="h-2 w-2 animate-pulse rounded-full bg-white/70" />
-                    <span className="h-2 w-2 animate-pulse rounded-full bg-white/70 [animation-delay:150ms]" />
-                    <span className="h-2 w-2 animate-pulse rounded-full bg-white/70 [animation-delay:300ms]" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Floating badge */}
-            <div className="absolute -bottom-4 -left-4 flex items-center gap-2 rounded-xl border border-green-200 bg-white px-4 py-2 shadow-lg">
-              <span className="relative flex h-3 w-3">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-                <span className="relative inline-flex h-3 w-3 rounded-full bg-green-500" />
-              </span>
-              <span className="text-sm font-medium text-gray-700">
-                AI responded in 8s
-              </span>
-            </div>
-          </div>
+    <section className="relative border-y border-white/10 bg-slate-950 py-16 text-white">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-20"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, rgba(148,163,184,0.08) 1px, transparent 1px)",
+          backgroundSize: "48px 100%",
+        }}
+      />
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-8 flex items-center gap-3 text-xs font-mono uppercase tracking-wider text-slate-500">
+          <span className="h-px flex-1 bg-gradient-to-r from-transparent to-white/10" />
+          <span>Live telemetry · across 500+ businesses</span>
+          <span className="h-px flex-1 bg-gradient-to-l from-transparent to-white/10" />
         </div>
+        <StatTicker />
       </div>
     </section>
   );
@@ -157,7 +53,7 @@ function SocialProof() {
   const logos = ["Celebrant Co", "WedPlan", "EventPro", "ServiceHub", "BookEasy"];
 
   return (
-    <section className="border-y border-gray-100 bg-gray-50/50 py-10">
+    <section className="border-b border-gray-100 bg-gray-50/50 py-10">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <p className="mb-8 text-center text-sm font-medium tracking-wide text-gray-500 uppercase">
           Trusted by 500+ service businesses across Australia
@@ -302,15 +198,12 @@ function HowItWorks() {
         <div className="mx-auto mt-16 max-w-2xl">
           {steps.map((step, i) => (
             <div key={step.title} className="relative flex gap-6 pb-12 last:pb-0">
-              {/* Vertical connecting line */}
               {i < steps.length - 1 && (
                 <div className="absolute left-5 top-12 bottom-0 w-px border-l-2 border-dashed border-blue-200" />
               )}
-              {/* Number circle */}
               <div className="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-purple-600 text-sm font-bold text-white shadow-md">
                 {i + 1}
               </div>
-              {/* Content */}
               <div className="pt-0.5">
                 <h3 className="text-lg font-semibold text-gray-900">
                   {step.title}
@@ -392,7 +285,6 @@ function AIAgents() {
               key={agent.name}
               className="relative overflow-hidden rounded-xl border border-gray-200 bg-white transition hover:shadow-lg"
             >
-              {/* Gradient top border */}
               <div
                 className={cn(
                   "h-1.5 w-full bg-gradient-to-r",
@@ -435,81 +327,6 @@ function AIAgents() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Channel Visualization                                              */
-/* ------------------------------------------------------------------ */
-
-const channels = [
-  { name: "WhatsApp", icon: MessageSquare, color: "bg-green-500", position: "top-0 left-1/2 -translate-x-1/2" },
-  { name: "Instagram", icon: MessageSquare, color: "bg-gradient-to-br from-pink-500 to-purple-600", position: "top-1/4 right-0" },
-  { name: "SMS", icon: MessageSquare, color: "bg-blue-500", position: "bottom-1/4 right-0" },
-  { name: "Voice", icon: Phone, color: "bg-orange-500", position: "bottom-1/4 left-0" },
-  { name: "Web Chat", icon: Globe, color: "bg-teal-500", position: "top-1/4 left-0" },
-];
-
-function ChannelVisualization() {
-  return (
-    <section className="bg-gray-50 py-24">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-            One inbox. Every channel.
-          </h2>
-        </div>
-
-        {/* Channel arc */}
-        <div className="mx-auto mt-16 max-w-3xl">
-          <div className="flex flex-col items-center gap-8 sm:gap-10">
-            {/* Channel icons row */}
-            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
-              {channels.map((ch) => (
-                <div key={ch.name} className="flex flex-col items-center gap-2">
-                  <div
-                    className={cn(
-                      "flex h-16 w-16 items-center justify-center rounded-2xl text-white shadow-lg sm:h-20 sm:w-20",
-                      ch.color
-                    )}
-                  >
-                    <ch.icon className="h-7 w-7 sm:h-8 sm:w-8" />
-                  </div>
-                  <span className="text-xs font-medium text-gray-500 sm:text-sm">
-                    {ch.name}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Connecting arrows */}
-            <div className="flex items-center gap-2 text-gray-300">
-              <div className="h-px w-8 bg-gray-300" />
-              <ArrowRight className="h-5 w-5 text-gray-400" />
-              <div className="h-px w-8 bg-gray-300" />
-            </div>
-
-            {/* Unified inbox box */}
-            <div className="flex items-center gap-4 rounded-2xl border-2 border-blue-200 bg-white px-8 py-5 shadow-xl shadow-blue-100/50">
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 text-white">
-                <Zap className="h-7 w-7" />
-              </div>
-              <div>
-                <p className="text-lg font-bold text-gray-900">Unified Inbox</p>
-                <p className="text-sm text-gray-500">
-                  All channels, one timeline
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <p className="mx-auto mt-10 max-w-lg text-center leading-relaxed text-gray-600">
-            All messages merge into a single timeline per contact. No more
-            switching between apps.
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /*  Use Case — The Celebrant Story                                     */
 /* ------------------------------------------------------------------ */
 
@@ -545,7 +362,6 @@ function UseCaseStory() {
 
         <div className="mx-auto mt-12 max-w-lg">
           <div className="rounded-2xl border border-gray-200 bg-white shadow-xl">
-            {/* Chat header */}
             <div className="flex items-center gap-3 rounded-t-2xl border-b border-gray-100 bg-gray-50 px-5 py-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-purple-600 text-xs font-bold text-white">
                 AI
@@ -558,7 +374,6 @@ function UseCaseStory() {
               </div>
             </div>
 
-            {/* Messages */}
             <div className="space-y-4 p-5">
               {chatMessages.map((msg, i) => (
                 <div
@@ -648,7 +463,6 @@ function Testimonials() {
               key={t.name}
               className="rounded-xl border border-gray-200 bg-white p-8 transition hover:shadow-lg"
             >
-              {/* Stars */}
               <div className="mb-4 flex gap-0.5">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <Star
@@ -785,12 +599,13 @@ function FinalCTA() {
 export default function HomePage() {
   return (
     <>
-      <Hero />
+      <HeroAI />
+      <StatsBand />
       <SocialProof />
       <Features />
       <HowItWorks />
       <AIAgents />
-      <ChannelVisualization />
+      <AgentFlow />
       <UseCaseStory />
       <Testimonials />
       <FAQ />

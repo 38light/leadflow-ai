@@ -107,7 +107,7 @@ async function executeUpdateContact(
 
 async function executeSearchKnowledge(
   input: Record<string, unknown>,
-  context: ToolContext
+  _context: ToolContext
 ) {
   const query = input.query as string;
 

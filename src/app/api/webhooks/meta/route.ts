@@ -49,7 +49,9 @@ export async function POST(request: NextRequest) {
 
     if (!isValid) {
       console.warn("[Meta Webhook] Invalid signature");
-      if (process.env.NODE_ENV === "production") {
+      // Reject forged payloads everywhere. The only bypass is an explicit,
+      // non-default dev flag — never gate this on NODE_ENV.
+      if (process.env.ALLOW_UNVERIFIED_WEBHOOKS !== "true") {
         return NextResponse.json(
           { error: "Invalid signature" },
           { status: 403 }

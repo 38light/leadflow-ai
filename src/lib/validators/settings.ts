@@ -19,6 +19,9 @@ export const updateIntegrationsSchema = z.object({
   meta_page_id: z.string().max(200).optional().nullable(),
   meta_access_token: z.string().max(1000).optional().nullable(),
   vapi_api_key: z.string().max(200).optional().nullable(),
+  sendgrid_api_key: z.string().max(500).optional().nullable(),
+  stripe_secret_key: z.string().max(500).optional().nullable(),
+  anthropic_api_key: z.string().max(500).optional().nullable(),
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

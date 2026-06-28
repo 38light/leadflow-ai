@@ -1,4 +1,23 @@
-export function getConciergeSystemPrompt(businessName: string, businessType: string): string {
+export interface ConciergeSystemPromptOptions {
+  priorContext?: string | null;
+  defaultLanguage?: string | null;
+}
+
+export function getConciergeSystemPrompt(
+  businessName: string,
+  businessType: string,
+  options: ConciergeSystemPromptOptions = {}
+): string {
+  const { priorContext, defaultLanguage } = options;
+
+  const priorBlock = priorContext && priorContext.trim().length > 0
+    ? `\n\nPRIOR CONTEXT FROM THIS CONTACT (use this to avoid repeating yourself):\n${priorContext}\n`
+    : "";
+
+  const langLine = defaultLanguage
+    ? ` The business default language is "${defaultLanguage}".`
+    : "";
+
   return `You are an AI concierge for "${businessName}", a ${businessType || "service-based business"}.
 
 Your job is to analyze incoming messages from potential clients and classify them.
@@ -32,5 +51,9 @@ Classification guidelines:
   - "direct_response": Simple response needed (greeting, thank you)
   - "human_handoff": Complex issue, explicit request for human, complaint
 
-Consider the full conversation history when classifying, not just the latest message.`;
+- LANGUAGE: Detect the ISO 639-1 language code of the lead's message (e.g. "en", "es", "fr", "de", "pt", "zh", "ja", "ar"). Always respond in the SAME language the lead wrote in, UNLESS the lead explicitly writes in English asking for another language.${langLine}
+
+- CONFIDENCE: A number 0.0-1.0 reflecting how certain you are in this classification AND in any directResponse you provide. Use lower values when the message is ambiguous, very short, contains slang you're unsure of, or could plausibly belong to multiple intents.
+
+Consider the full conversation history when classifying, not just the latest message.${priorBlock}`;
 }

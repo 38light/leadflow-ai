@@ -116,6 +116,7 @@ const sidebarNav = [
   { label: "Analytics", href: "#analytics" },
   { label: "Rate Limits", href: "#rate-limits" },
   { label: "Webhooks", href: "#webhooks" },
+  { label: "Zapier", href: "#zapier" },
   { label: "SDKs", href: "#sdks" },
 ];
 
@@ -650,6 +651,126 @@ X-RateLimit-Reset: 1711094460`}
                   </code>{" "}
                   header to ensure authenticity.
                 </p>
+              </section>
+
+              {/* ---- Zapier ---- */}
+              <section id="zapier" className="mb-16 scroll-mt-24">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-100 text-orange-600">
+                    <Zap className="h-5 w-5" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Connect via Zapier
+                  </h2>
+                </div>
+
+                <p className="text-gray-600 leading-relaxed mb-4">
+                  Wire LeadFlow into 6,000+ apps without writing any code.
+                  Zapier can listen for our outbound webhooks as triggers and
+                  use your API keys to perform actions in your account.
+                </p>
+
+                <div className="grid gap-4 md:grid-cols-2 mb-6">
+                  <div className="rounded-xl border border-gray-200 bg-white p-5">
+                    <h3 className="text-base font-semibold text-gray-900 mb-1">
+                      Triggers (webhooks)
+                    </h3>
+                    <p className="text-sm text-gray-500 mb-3">
+                      Use the Zapier &ldquo;Webhooks by Zapier&rdquo; app with a{" "}
+                      <em>Catch Hook</em> trigger. Paste the Zap&rsquo;s URL
+                      into LeadFlow&rsquo;s webhook endpoints.
+                    </p>
+                    <Link
+                      href="/settings/webhooks"
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+                    >
+                      Manage webhook endpoints
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+                  <div className="rounded-xl border border-gray-200 bg-white p-5">
+                    <h3 className="text-base font-semibold text-gray-900 mb-1">
+                      Actions (API keys)
+                    </h3>
+                    <p className="text-sm text-gray-500 mb-3">
+                      Generate an API key and use Zapier&rsquo;s{" "}
+                      <em>Custom Request</em> action with{" "}
+                      <code className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs">
+                        Authorization: Bearer
+                      </code>{" "}
+                      to create contacts, send messages, and more.
+                    </p>
+                    <Link
+                      href="/settings/api-keys"
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+                    >
+                      Manage API keys
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+                </div>
+
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                  Available trigger events
+                </h3>
+                <div className="overflow-hidden rounded-xl border border-gray-200 mb-6">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="py-3 px-5 text-sm font-semibold text-gray-500">
+                          Event
+                        </th>
+                        <th className="py-3 px-5 text-sm font-semibold text-gray-500">
+                          Description
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-t border-gray-100">
+                        <td className="py-3 px-5 text-sm font-mono text-blue-600">
+                          contact.created
+                        </td>
+                        <td className="py-3 px-5 text-sm text-gray-600">
+                          Fires when a new lead is captured
+                        </td>
+                      </tr>
+                      <tr className="border-t border-gray-100 bg-gray-50/50">
+                        <td className="py-3 px-5 text-sm font-mono text-blue-600">
+                          booking.completed
+                        </td>
+                        <td className="py-3 px-5 text-sm text-gray-600">
+                          Fires after a booking is marked completed
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                  Example Zaps
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4">
+                    <p className="text-sm font-semibold text-gray-900">
+                      New hot lead &rarr; Slack
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Trigger:{" "}
+                      <code className="font-mono text-xs">contact.created</code>{" "}
+                      &middot; Action: post a message to a Slack channel.
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4">
+                    <p className="text-sm font-semibold text-gray-900">
+                      Booking completed &rarr; Google Sheets
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Trigger:{" "}
+                      <code className="font-mono text-xs">booking.completed</code>{" "}
+                      &middot; Action: append a row to a Google Sheet.
+                    </p>
+                  </div>
+                </div>
               </section>
 
               {/* ---- SDKs ---- */}

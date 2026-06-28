@@ -2,7 +2,13 @@ import Link from "next/link";
 import {
   Radio, Sparkles, Filter, Calendar, CreditCard, RefreshCw,
   MessageSquare, Shield, Zap, BarChart3, Users, Globe,
+  ArrowRight,
 } from "lucide-react";
+import {
+  SectionHeroDark,
+  ScrollReveal,
+  SpotlightCard,
+} from "@/components/marketing";
 
 const features = [
   {
@@ -153,61 +159,109 @@ const features = [
 
 export default function FeaturesPage() {
   return (
-    <div className="py-20">
-      {/* Header */}
-      <div className="max-w-4xl mx-auto text-center px-4 mb-16">
-        <h1 className="text-4xl md:text-5xl font-bold mb-6">
-          Every feature you need to{" "}
-          <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            convert leads on autopilot
-          </span>
-        </h1>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          LeadFlow AI combines omni-channel messaging, intelligent AI agents,
-          and powerful integrations into one platform.
-        </p>
-      </div>
+    <div>
+      <SectionHeroDark
+        eyebrow="Feature Matrix"
+        title={
+          <>
+            Every feature you need to{" "}
+            <span className="bg-gradient-to-r from-cyan-400 via-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
+              convert leads on autopilot
+            </span>
+          </>
+        }
+        subtitle="LeadFlow AI combines omni-channel messaging, intelligent AI agents, and powerful integrations into one platform."
+      />
 
       {/* Feature Grid */}
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {features.map((feature) => {
-            const Icon = feature.icon;
-            return (
-              <div
-                key={feature.title}
-                className="bg-white border border-gray-200 rounded-2xl p-8 hover:shadow-lg transition-shadow"
-              >
-                <div className={`w-12 h-12 rounded-xl ${feature.color} flex items-center justify-center mb-5`}>
-                  <Icon className="w-6 h-6" />
-                </div>
-                <h3 className="text-xl font-semibold mb-3">{feature.title}</h3>
-                <p className="text-gray-600 mb-5">{feature.description}</p>
-                <ul className="space-y-2">
-                  {feature.details.map((detail) => (
-                    <li key={detail} className="flex items-start gap-2 text-sm text-gray-500">
-                      <Zap className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
-                      {detail}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
+      <section className="relative isolate overflow-hidden bg-slate-950 py-24 text-white">
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-30"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(148,163,184,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.08) 1px, transparent 1px)",
+            backgroundSize: "48px 48px",
+            maskImage:
+              "radial-gradient(ellipse 70% 60% at 50% 40%, black 40%, transparent 80%)",
+          }}
+        />
+        <div className="pointer-events-none absolute top-1/4 left-0 h-[460px] w-[460px] rounded-full bg-violet-600/15 blur-[120px]" />
+        <div className="pointer-events-none absolute bottom-0 right-0 h-[460px] w-[460px] rounded-full bg-cyan-500/15 blur-[120px]" />
+
+        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {features.map((feature, i) => {
+              const Icon = feature.icon;
+              return (
+                <ScrollReveal key={feature.title} delay={i * 80}>
+                  <SpotlightCard className="h-full p-8">
+                    <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-gradient-to-br from-cyan-500/20 to-violet-600/20 text-cyan-300">
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <h3 className="mb-3 text-xl font-semibold text-white">
+                      {feature.title}
+                    </h3>
+                    <p className="mb-5 text-sm leading-relaxed text-slate-300">
+                      {feature.description}
+                    </p>
+                    <ul className="space-y-2">
+                      {feature.details.map((detail) => (
+                        <li
+                          key={detail}
+                          className="flex items-start gap-2 text-sm text-slate-400"
+                        >
+                          <Zap className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
+                          {detail}
+                        </li>
+                      ))}
+                    </ul>
+                  </SpotlightCard>
+                </ScrollReveal>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* CTA */}
-      <div className="max-w-4xl mx-auto text-center px-4 mt-20">
-        <h2 className="text-3xl font-bold mb-4">Ready to see it in action?</h2>
-        <p className="text-gray-600 mb-8">Start your free trial today. No credit card required.</p>
-        <Link
-          href="/register"
-          className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl text-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all"
-        >
-          Start Free Trial
-        </Link>
-      </div>
+      <section className="relative isolate overflow-hidden bg-slate-950 py-24 text-white">
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-30"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(148,163,184,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.08) 1px, transparent 1px)",
+            backgroundSize: "48px 48px",
+            maskImage:
+              "radial-gradient(ellipse 70% 60% at 50% 40%, black 40%, transparent 80%)",
+          }}
+        />
+        <div className="pointer-events-none absolute -top-20 left-1/2 h-[360px] w-[360px] -translate-x-1/2 rounded-full bg-fuchsia-500/20 blur-[120px]" />
+
+        <ScrollReveal>
+          <div className="relative z-10 mx-auto max-w-4xl px-4 text-center">
+            <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">
+              Ready to see it{" "}
+              <span className="bg-gradient-to-r from-cyan-400 via-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
+                in action
+              </span>
+              ?
+            </h2>
+            <p className="mb-8 text-lg text-slate-300">
+              Start your free trial today. No credit card required.
+            </p>
+            <Link
+              href="/register"
+              className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-cyan-500 to-violet-600 px-8 py-4 text-lg font-semibold text-white shadow-[0_0_40px_-8px_rgba(139,92,246,0.6)] transition hover:shadow-[0_0_60px_-6px_rgba(139,92,246,0.9)]"
+            >
+              <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-white/0 via-white/30 to-white/0 transition duration-700 group-hover:translate-x-full" />
+              Start Free Trial
+              <ArrowRight className="h-5 w-5 transition group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+        </ScrollReveal>
+      </section>
     </div>
   );
 }

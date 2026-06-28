@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [],
   },
+  experimental: {
+    // Disable filesystem cache to avoid rename issues with spaces in path
+    webpackBuildWorker: false,
+  },
 };
 
 export default nextConfig;

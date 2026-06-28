@@ -6,6 +6,14 @@ const settingsSections = [
   { href: "/settings/ai" as const, title: "AI Configuration", description: "Customize AI agent behavior and prompts" },
   { href: "/settings/billing" as const, title: "Billing", description: "Manage your subscription and usage" },
   { href: "/settings/compliance" as const, title: "Compliance", description: "Opt-out rules, AI transparency, and data sovereignty" },
+  { href: "/settings/team" as const, title: "Team", description: "Invite team members and manage their roles" },
+  { href: "/settings/api-keys" as const, title: "API Keys", description: "Integrate LeadFlow AI with your own apps and tools" },
+  { href: "/settings/webhooks" as const, title: "Webhooks", description: "Receive real-time events in your own systems" },
+  { href: "/settings/slack" as const, title: "Slack", description: "Get notified in Slack when hot leads or bookings come in" },
+  { href: "/settings/agency" as const, title: "Agency", description: "Manage client sub-accounts under your agency plan" },
+  { href: "/settings/widget" as const, title: "Chat Widget", description: "Embed the web chat widget on your website" },
+  { href: "/settings/automation" as const, title: "Automation", description: "Follow-up waterfall rules for stalled contacts" },
+  { href: "/referrals" as const, title: "Referrals", description: "Invite friends and earn credits when they sign up" },
 ];
 
 export default function SettingsPage() {

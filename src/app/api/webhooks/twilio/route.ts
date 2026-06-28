@@ -36,8 +36,9 @@ export async function POST(request: NextRequest) {
       console.warn(
         `[Twilio Webhook] Invalid signature for ${isWhatsApp ? "WhatsApp" : "SMS"} message`
       );
-      // In production, return 403. For development, log and continue.
-      if (process.env.NODE_ENV === "production") {
+      // Reject forged payloads everywhere. The only bypass is an explicit,
+      // non-default dev flag — never gate this on NODE_ENV.
+      if (process.env.ALLOW_UNVERIFIED_WEBHOOKS !== "true") {
         return new Response("Forbidden", { status: 403 });
       }
     }

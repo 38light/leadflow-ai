@@ -8,8 +8,16 @@ import { cn } from "@/lib/utils";
 
 const navLinks = [
   { label: "Features", href: "/features" as const },
+  {
+    label: "Solutions",
+    href: "#" as const,
+    children: [
+      { label: "All Solutions", href: "/solutions" as const },
+      { label: "Marriage Celebrants", href: "/solutions/marriage-celebrants" as const },
+      { label: "Driving Instructors", href: "/solutions/driving-instructors" as const },
+    ],
+  },
   { label: "Pricing", href: "/pricing" as const },
-  { label: "Integrations", href: "/integrations" as const },
   { label: "Case Studies", href: "/case-studies" as const },
   {
     label: "Resources",
@@ -92,12 +100,13 @@ export function Header() {
 
             if (hasChildren) {
               return (
-                <div key={link.label} className="relative">
+                <div
+                  key={link.label}
+                  className="relative"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpenDropdown(isDropdownOpen ? null : link.label);
-                    }}
+                    onClick={() => setOpenDropdown(isDropdownOpen ? null : link.label)}
                     className={cn(
                       "flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-gray-50 hover:text-gray-900",
                       isDropdownOpen ? "text-gray-900 bg-gray-50" : "text-gray-600"

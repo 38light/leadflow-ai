@@ -9,11 +9,18 @@ export interface ConciergeDecision {
   routing: "knowledge" | "action" | "direct_response" | "human_handoff";
   directResponse?: string;
   reasoning: string;
+  language: string;
+  confidence: number;
+}
+
+export interface RunConciergeOptions {
+  priorContext?: string | null;
+  defaultLanguage?: string | null;
 }
 
 const classifyTool: Anthropic.Tool = {
   name: "classify_message",
-  description: "Classify the incoming message by intent, sentiment, urgency, and routing.",
+  description: "Classify the incoming message by intent, sentiment, urgency, language, confidence, and routing.",
   input_schema: {
     type: "object" as const,
     properties: {
@@ -26,29 +33,60 @@ const classifyTool: Anthropic.Tool = {
       routing: { type: "string", enum: ["knowledge", "action", "direct_response", "human_handoff"] },
       direct_response: {
         type: "string",
-        description: "If routing is 'direct_response', provide the response text here.",
+        description: "If routing is 'direct_response', provide the response text here, in the contact's detected language.",
       },
       reasoning: {
         type: "string",
         description: "Brief explanation of why you classified it this way.",
       },
+      language: {
+        type: "string",
+        description: "ISO 639-1 code of the contact's message language (e.g. 'en', 'es', 'fr'). Lowercase.",
+      },
+      confidence: {
+        type: "number",
+        description: "0.0-1.0 confidence in the classification and any directResponse provided.",
+        minimum: 0,
+        maximum: 1,
+      },
     },
-    required: ["intent", "sentiment", "urgency", "routing", "reasoning"],
+    required: ["intent", "sentiment", "urgency", "routing", "reasoning", "language", "confidence"],
   },
 };
+
+function clampConfidence(value: unknown): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return 0.5;
+  if (n < 0) return 0;
+  if (n > 1) return 1;
+  return n;
+}
+
+function normalizeLanguage(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim().toLowerCase();
+  if (trimmed.length < 2 || trimmed.length > 8) return fallback;
+  return trimmed;
+}
 
 export async function runConcierge(
   messages: Anthropic.MessageParam[],
   businessName: string,
   businessType: string,
-  model?: string
+  model?: string,
+  options: RunConciergeOptions = {}
 ): Promise<{ decision: ConciergeDecision; inputTokens: number; outputTokens: number; latencyMs: number }> {
+  const fallbackLang = options.defaultLanguage ?? "en";
+
   const result = await callClaude({
-    systemPrompt: getConciergeSystemPrompt(businessName, businessType),
+    systemPrompt: getConciergeSystemPrompt(businessName, businessType, {
+      priorContext: options.priorContext,
+      defaultLanguage: options.defaultLanguage,
+    }),
     messages,
     tools: [classifyTool],
     model,
-    maxTokens: 512,
+    maxTokens: 600,
   });
 
   const toolUse = extractToolUse(result.response);
@@ -78,6 +116,8 @@ export async function runConcierge(
         routing,
         directResponse: input.direct_response ? String(input.direct_response) : undefined,
         reasoning: String(input.reasoning ?? ""),
+        language: normalizeLanguage(input.language, fallbackLang),
+        confidence: clampConfidence(input.confidence),
       },
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
@@ -93,6 +133,8 @@ export async function runConcierge(
       urgency: "medium",
       routing: "knowledge",
       reasoning: "Could not classify — defaulting to knowledge agent.",
+      language: fallbackLang,
+      confidence: 0.3,
     },
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,

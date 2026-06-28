@@ -1,8 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { skipAuthEnabled } from "@/lib/security/skip-auth";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
+
+  // DEV MODE: Skip all auth redirects when SKIP_AUTH is set (local-only)
+  if (skipAuthEnabled()) {
+    return supabaseResponse;
+  }
 
   // Skip auth check if Supabase is not configured
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -44,8 +50,11 @@ export async function updateSession(request: NextRequest) {
     "/knowledge",
     "/channels",
     "/analytics",
+    "/system-flow",
     "/pipelines",
     "/settings",
+    "/admin",
+    "/bookings",
   ];
 
   const isProtected = protectedPrefixes.some((prefix) =>

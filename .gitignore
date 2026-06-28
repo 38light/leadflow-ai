@@ -18,6 +18,12 @@ dist/
 .env.test.local
 .env.production.local
 
+# backups (may contain secrets, e.g. old cloud keys)
+*.bak
+
+# local agent tooling / worktrees
+.claude/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

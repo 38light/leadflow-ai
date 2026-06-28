@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { getUser } from "@/lib/auth/get-user";
 import { createContactSchema, contactFiltersSchema } from "@/lib/validators/contacts";
+import { deliverWebhookEvent } from "@/lib/webhooks/deliver";
+import { sendSlackNotification } from "@/lib/integrations/slack";
 
 export async function GET(request: NextRequest) {
   const user = await getUser();
@@ -68,6 +70,38 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Non-blocking webhook delivery
+  void deliverWebhookEvent(supabase, user.id, {
+    event: "contact.created",
+    timestamp: new Date().toISOString(),
+    data: {
+      contactId: data.id,
+      name: data.name,
+      source_channel: data.source_channel,
+      status: data.status,
+    },
+  });
+
+  // Non-blocking Slack notification for hot leads
+  if (data.temperature === "hot") {
+    void (async () => {
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("slack_webhook_url, slack_notify_hot_leads")
+          .eq("user_id", user.id)
+          .single();
+        if (profile?.slack_webhook_url && profile.slack_notify_hot_leads) {
+          await sendSlackNotification(profile.slack_webhook_url, {
+            text: `New hot lead: *${data.name ?? "Unknown"}* via ${data.source_channel ?? "manual"}`,
+          });
+        }
+      } catch {
+        // swallow
+      }
+    })();
   }
 
   return NextResponse.json({ data }, { status: 201 });

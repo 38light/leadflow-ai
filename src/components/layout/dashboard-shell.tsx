@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
 import { MobileNav } from "./mobile-nav";
+import { ChangelogPopup } from "./changelog-popup";
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   return (
@@ -20,6 +21,9 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom nav */}
       <MobileNav />
+
+      {/* What's-new popup (one-time per version) */}
+      <ChangelogPopup />
     </div>
   );
 }

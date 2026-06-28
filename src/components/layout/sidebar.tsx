@@ -13,6 +13,11 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  GitBranch,
+  Shield,
+  CalendarCheck,
+  Map,
+  Megaphone,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -27,10 +32,15 @@ const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/conversations", label: "Conversations", icon: MessageSquare },
   { href: "/contacts", label: "Contacts", icon: Users },
+  { href: "/bookings", label: "Bookings", icon: CalendarCheck },
   { href: "/knowledge", label: "Knowledge", icon: BookOpen },
   { href: "/channels", label: "Channels", icon: Radio },
+  { href: "/broadcasts", label: "Broadcasts", icon: Megaphone },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/system-flow", label: "System Flow", icon: GitBranch },
+  { href: "/app-pages", label: "App Pages", icon: Map },
   { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/admin", label: "Admin", icon: Shield },
 ];
 
 export function Sidebar() {

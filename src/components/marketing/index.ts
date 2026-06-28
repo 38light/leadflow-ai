@@ -1,3 +1,10 @@
 export { Header } from "./header";
 export { Footer } from "./footer";
 export { NewsletterForm } from "./newsletter-form";
+export { HeroAI } from "./hero-ai";
+export { StatTicker } from "./stat-ticker";
+export { AgentFlow } from "./agent-flow";
+export { CursorGlow } from "./cursor-glow";
+export { ScrollReveal } from "./scroll-reveal";
+export { SectionHeroDark } from "./section-hero-dark";
+export { SpotlightCard } from "./spotlight-card";

@@ -1,1 +1,28 @@
 @import "tailwindcss";
+
+@keyframes lf-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes lf-slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes lf-zoom-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@utility animate-fade-in {
+  animation: lf-fade-in 0.3s ease-out both;
+}
+
+@utility animate-slide-up {
+  animation: lf-slide-up 0.4s ease-out both;
+}
+
+@utility animate-zoom-in {
+  animation: lf-zoom-in 0.18s ease-out both;
+}

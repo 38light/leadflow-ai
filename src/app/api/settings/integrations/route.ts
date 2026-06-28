@@ -9,7 +9,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("hubspot_portal_id, twilio_account_sid, twilio_phone_number, meta_page_id, vapi_api_key")
+    .select("hubspot_portal_id, twilio_account_sid, twilio_phone_number, meta_page_id, meta_access_token, vapi_api_key, anthropic_api_key, sendgrid_api_key, stripe_secret_key")
     .eq("user_id", user.id)
     .single();
 
@@ -23,7 +23,11 @@ export async function GET() {
       hubspot: { connected: !!data.hubspot_portal_id, portal_id: data.hubspot_portal_id },
       twilio: { connected: !!data.twilio_account_sid, phone: data.twilio_phone_number },
       meta: { connected: !!data.meta_page_id },
+      whatsapp: { connected: !!data.meta_access_token },
       vapi: { connected: !!data.vapi_api_key },
+      anthropic: { connected: !!data.anthropic_api_key },
+      sendgrid: { connected: !!data.sendgrid_api_key },
+      stripe: { connected: !!data.stripe_secret_key },
     },
   });
 }
@@ -51,7 +55,7 @@ export async function PUT(request: NextRequest) {
     .from("profiles")
     .update(input)
     .eq("user_id", user.id)
-    .select("hubspot_portal_id, twilio_account_sid, twilio_phone_number, meta_page_id, vapi_api_key")
+    .select("hubspot_portal_id, twilio_account_sid, twilio_phone_number, meta_page_id, meta_access_token, vapi_api_key, anthropic_api_key, sendgrid_api_key, stripe_secret_key")
     .single();
 
   if (error) {
@@ -63,7 +67,11 @@ export async function PUT(request: NextRequest) {
       hubspot: { connected: !!data.hubspot_portal_id },
       twilio: { connected: !!data.twilio_account_sid },
       meta: { connected: !!data.meta_page_id },
+      whatsapp: { connected: !!data.meta_access_token },
       vapi: { connected: !!data.vapi_api_key },
+      anthropic: { connected: !!data.anthropic_api_key },
+      sendgrid: { connected: !!data.sendgrid_api_key },
+      stripe: { connected: !!data.stripe_secret_key },
     },
   });
 }

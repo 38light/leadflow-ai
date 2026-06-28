@@ -42,7 +42,7 @@ export function useRealtime<T extends Record<string, unknown>>({
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      channel.unsubscribe();
     };
   }, [table, event, filter, onPayload]);
 }

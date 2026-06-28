@@ -13,6 +13,7 @@ interface ProfileRow {
   website: string | null;
   ai_enabled: boolean;
   subscription_tier: string;
+  role: string;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   hubspot_portal_id: string | null;
@@ -24,10 +25,60 @@ interface ProfileRow {
   twilio_auth_token: string | null;
   twilio_phone_number: string | null;
   vapi_api_key: string | null;
+  anthropic_api_key: string | null;
+  sendgrid_api_key: string | null;
+  stripe_secret_key: string | null;
   google_calendar_token: Json | null;
   outlook_calendar_token: Json | null;
+  ai_confidence_threshold: number;
+  require_approval: boolean;
+  ai_memory_depth: number;
+  training_data_opt_out: boolean;
+  default_language: string;
+  slack_webhook_url: string | null;
+  slack_notify_hot_leads: boolean | null;
+  slack_notify_bookings: boolean | null;
+  stale_lead_hours: number | null;
+  referral_code: string | null;
+  referred_by_code: string | null;
+  hide_branding: boolean | null;
   created_at: string;
   updated_at: string;
+}
+
+interface AIApprovalRow {
+  id: string;
+  user_id: string;
+  conversation_id: string | null;
+  contact_id: string | null;
+  draft_content: string;
+  confidence: number | null;
+  reasoning: string | null;
+  status: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  created_at: string;
+}
+
+interface TeamMemberRow {
+  id: string;
+  owner_id: string;
+  member_user_id: string;
+  role: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface TeamInvitationRow {
+  id: string;
+  owner_id: string;
+  email: string;
+  role: string;
+  token: string;
+  status: string;
+  expires_at: string;
+  accepted_at: string | null;
+  created_at: string;
 }
 
 interface ContactRow {
@@ -81,6 +132,7 @@ interface ConversationRow {
   intent: string | null;
   last_message_at: string | null;
   unread_count: number;
+  metadata: Json;
   created_at: string;
   updated_at: string;
 }
@@ -220,6 +272,94 @@ interface WebhookLogRow {
   created_at: string;
 }
 
+interface ServiceRow {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  duration_minutes: number;
+  price_cents: number;
+  currency: string;
+  is_active: boolean;
+  color: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface AvailabilityScheduleRow {
+  id: string;
+  user_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+interface BlockedDateRow {
+  id: string;
+  user_id: string;
+  blocked_date: string;
+  reason: string | null;
+  all_day: boolean;
+  start_time: string | null;
+  end_time: string | null;
+  created_at: string;
+}
+
+interface BookingSettingsRow {
+  id: string;
+  user_id: string;
+  booking_url_slug: string | null;
+  business_name: string | null;
+  business_description: string | null;
+  logo_url: string | null;
+  min_notice_hours: number;
+  max_advance_days: number;
+  slot_duration_minutes: number;
+  buffer_minutes: number;
+  require_payment: boolean;
+  deposit_amount_cents: number;
+  confirmation_message: string;
+  cancellation_policy: string | null;
+  timezone: string;
+  allowed_areas: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+interface BookingRow {
+  id: string;
+  user_id: string;
+  service_id: string | null;
+  contact_id: string | null;
+  client_name: string;
+  client_email: string;
+  client_phone: string | null;
+  booking_date: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  notes: string | null;
+  internal_notes: string | null;
+  location: string | null;
+  area: string | null;
+  payment_status: string;
+  payment_amount_cents: number;
+  stripe_payment_intent_id: string | null;
+  stripe_checkout_session_id: string | null;
+  cancellation_reason: string | null;
+  cancelled_at: string | null;
+  confirmed_at: string | null;
+  completed_at: string | null;
+  reminder_sent_at: string | null;
+  metadata: Json;
+  created_at: string;
+  updated_at: string;
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -299,6 +439,54 @@ export type Database = {
         Row: WebhookLogRow;
         Insert: Partial<WebhookLogRow> & { source: string };
         Update: Partial<WebhookLogRow>;
+        Relationships: [];
+      };
+      team_members: {
+        Row: TeamMemberRow;
+        Insert: Partial<TeamMemberRow> & { owner_id: string; member_user_id: string };
+        Update: Partial<TeamMemberRow>;
+        Relationships: [];
+      };
+      team_invitations: {
+        Row: TeamInvitationRow;
+        Insert: Partial<TeamInvitationRow> & { owner_id: string; email: string };
+        Update: Partial<TeamInvitationRow>;
+        Relationships: [];
+      };
+      services: {
+        Row: ServiceRow;
+        Insert: Partial<ServiceRow> & { user_id: string; name: string };
+        Update: Partial<ServiceRow>;
+        Relationships: [];
+      };
+      availability_schedules: {
+        Row: AvailabilityScheduleRow;
+        Insert: Partial<AvailabilityScheduleRow> & { user_id: string; day_of_week: number; start_time: string; end_time: string };
+        Update: Partial<AvailabilityScheduleRow>;
+        Relationships: [];
+      };
+      blocked_dates: {
+        Row: BlockedDateRow;
+        Insert: Partial<BlockedDateRow> & { user_id: string; blocked_date: string };
+        Update: Partial<BlockedDateRow>;
+        Relationships: [];
+      };
+      booking_settings: {
+        Row: BookingSettingsRow;
+        Insert: Partial<BookingSettingsRow> & { user_id: string };
+        Update: Partial<BookingSettingsRow>;
+        Relationships: [];
+      };
+      bookings: {
+        Row: BookingRow;
+        Insert: Partial<BookingRow> & { user_id: string; client_name: string; client_email: string; booking_date: string; start_time: string; end_time: string };
+        Update: Partial<BookingRow>;
+        Relationships: [];
+      };
+      ai_approvals: {
+        Row: AIApprovalRow;
+        Insert: Partial<AIApprovalRow> & { user_id: string; draft_content: string };
+        Update: Partial<AIApprovalRow>;
         Relationships: [];
       };
     };

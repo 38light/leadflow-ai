@@ -12,6 +12,7 @@ import {
   Upload,
   ArrowRight,
 } from "lucide-react";
+import { SectionHeroDark, ScrollReveal } from "@/components/marketing";
 
 type CellValue =
   | { type: "check"; text?: string }
@@ -157,7 +158,7 @@ function CellIcon({ value }: { value: CellValue }) {
   if (value.type === "check") {
     return (
       <div className="flex flex-col items-center gap-1">
-        <Check className="w-5 h-5 text-green-600" />
+        <Check className="w-5 h-5 text-cyan-400" />
         {value.text && (
           <span className="text-xs text-gray-600">{value.text}</span>
         )}
@@ -167,7 +168,7 @@ function CellIcon({ value }: { value: CellValue }) {
   if (value.type === "x") {
     return (
       <div className="flex flex-col items-center gap-1">
-        <X className="w-5 h-5 text-red-400" />
+        <X className="w-5 h-5 text-slate-500" />
         {value.text && (
           <span className="text-xs text-gray-400">{value.text}</span>
         )}
@@ -186,71 +187,73 @@ function CellIcon({ value }: { value: CellValue }) {
 
 export default function ComparePage() {
   return (
-    <div className="py-20">
+    <div>
       {/* Hero */}
-      <div className="max-w-4xl mx-auto text-center px-4 mb-16">
-        <h1 className="text-4xl md:text-5xl font-bold mb-6">
-          Why teams choose{" "}
-          <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            LeadFlow AI
-          </span>
-        </h1>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          See how LeadFlow stacks up against the alternatives.
-        </p>
-      </div>
+      <SectionHeroDark
+        eyebrow="Head-to-head"
+        title={
+          <>
+            Why teams switch to{" "}
+            <span className="bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent">
+              LeadFlow
+            </span>
+          </>
+        }
+        subtitle="See how LeadFlow stacks up against the alternatives."
+      />
 
       {/* Comparison Table */}
-      <div className="max-w-5xl mx-auto px-4 mb-20">
+      <div className="max-w-5xl mx-auto px-4 py-20">
         <div className="overflow-x-auto">
-          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden min-w-[640px]">
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden min-w-[640px] group/table">
             {/* Header */}
             <div className="grid grid-cols-5 bg-gray-50 border-b border-gray-200">
               <div className="px-6 py-4 font-semibold text-gray-700">
                 Feature
               </div>
-              <div className="px-4 py-4 text-center">
-                <span className="font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              <div className="px-4 py-4 text-center transition-colors hover:bg-cyan-50/60">
+                <span className="font-bold bg-gradient-to-r from-cyan-500 to-violet-500 bg-clip-text text-transparent">
                   LeadFlow AI
                 </span>
               </div>
-              <div className="px-4 py-4 text-center font-semibold text-gray-500 text-sm">
+              <div className="px-4 py-4 text-center font-semibold text-gray-500 text-sm transition-colors hover:bg-gray-100">
                 Traditional Methods
               </div>
-              <div className="px-4 py-4 text-center font-semibold text-gray-500 text-sm">
+              <div className="px-4 py-4 text-center font-semibold text-gray-500 text-sm transition-colors hover:bg-gray-100">
                 Generic Chatbots
               </div>
-              <div className="px-4 py-4 text-center font-semibold text-gray-500 text-sm">
+              <div className="px-4 py-4 text-center font-semibold text-gray-500 text-sm transition-colors hover:bg-gray-100">
                 Competitors
               </div>
             </div>
 
             {/* Rows */}
             {comparisonData.map((row, index) => (
-              <div
-                key={row.feature}
-                className={`grid grid-cols-5 ${
-                  index < comparisonData.length - 1
-                    ? "border-b border-gray-100"
-                    : ""
-                }`}
-              >
-                <div className="px-6 py-4 font-medium text-gray-900 text-sm">
-                  {row.feature}
+              <ScrollReveal key={row.feature} delay={index * 50}>
+                <div
+                  className={`grid grid-cols-5 ${
+                    index < comparisonData.length - 1
+                      ? "border-b border-gray-100"
+                      : ""
+                  }`}
+                >
+                  <div className="px-6 py-4 font-medium text-gray-900 text-sm">
+                    {row.feature}
+                  </div>
+                  <div className="px-4 py-4 flex justify-center bg-cyan-50/30 transition-colors hover:bg-cyan-100/50">
+                    <CellIcon value={row.leadflow} />
+                  </div>
+                  <div className="px-4 py-4 flex justify-center transition-colors hover:bg-gray-50">
+                    <CellIcon value={row.traditional} />
+                  </div>
+                  <div className="px-4 py-4 flex justify-center transition-colors hover:bg-gray-50">
+                    <CellIcon value={row.chatbots} />
+                  </div>
+                  <div className="px-4 py-4 flex justify-center transition-colors hover:bg-gray-50">
+                    <CellIcon value={row.competitors} />
+                  </div>
                 </div>
-                <div className="px-4 py-4 flex justify-center bg-blue-50/30">
-                  <CellIcon value={row.leadflow} />
-                </div>
-                <div className="px-4 py-4 flex justify-center">
-                  <CellIcon value={row.traditional} />
-                </div>
-                <div className="px-4 py-4 flex justify-center">
-                  <CellIcon value={row.chatbots} />
-                </div>
-                <div className="px-4 py-4 flex justify-center">
-                  <CellIcon value={row.competitors} />
-                </div>
-              </div>
+              </ScrollReveal>
             ))}
           </div>
         </div>
@@ -312,7 +315,7 @@ export default function ComparePage() {
       </div>
 
       {/* CTA */}
-      <div className="max-w-4xl mx-auto text-center px-4">
+      <div className="max-w-4xl mx-auto text-center px-4 pb-20">
         <h2 className="text-3xl font-bold mb-4">
           See the difference yourself
         </h2>
