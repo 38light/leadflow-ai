@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { getUser } from "@/lib/auth/get-user";
 import { createContactSchema, contactFiltersSchema } from "@/lib/validators/contacts";
+import { dispatchWebhookEvent } from "@/lib/webhooks/deliver";
 
 export async function GET(request: NextRequest) {
   const user = await getUser();
@@ -69,6 +70,14 @@ export async function POST(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // Fire the contact.created webhook (delivered after the response is sent).
+  await dispatchWebhookEvent({
+    supabase,
+    userId: user.id,
+    event: "contact.created",
+    payload: data as Record<string, unknown>,
+  });
 
   return NextResponse.json({ data }, { status: 201 });
 }

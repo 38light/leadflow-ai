@@ -97,6 +97,32 @@ export interface Message {
   created_at: string;
 }
 
+// Outbound webhooks
+export type WebhookEventType = "contact.created" | "booking.created";
+
+export interface WebhookEndpoint {
+  id: string;
+  user_id: string;
+  url: string;
+  secret: string;
+  events: WebhookEventType[];
+  description: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  user_id: string;
+  endpoint_id: string;
+  event_type: WebhookEventType;
+  status: "success" | "failed";
+  status_code: number | null;
+  error: string | null;
+  created_at: string;
+}
+
 // Knowledge Base
 export interface KnowledgeBase {
   id: string;
