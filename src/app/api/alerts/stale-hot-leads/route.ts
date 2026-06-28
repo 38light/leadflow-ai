@@ -43,7 +43,8 @@ export async function GET() {
     .order("last_interaction_at", { ascending: true });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[API]", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 
   const contacts: StaleContact[] = data ?? [];

@@ -76,7 +76,10 @@ export async function DELETE(
       .eq("id", id)
       .eq("owner_id", ctx.ownerId);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      console.error("[API]", error);
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
     return NextResponse.json({ data: { deleted: true } });
   }
 

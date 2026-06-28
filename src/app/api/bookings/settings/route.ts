@@ -147,7 +147,8 @@ export async function PUT(request: NextRequest) {
   }
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[API]", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 
   // Persist hide_branding on the profile — but only if the user is on a paid plan.

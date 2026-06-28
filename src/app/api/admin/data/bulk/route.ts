@@ -55,7 +55,8 @@ export async function POST(req: NextRequest) {
         .eq("user_id", data.user_id);
 
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error("[API]", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
       }
 
       await logAuditEvent({
@@ -78,7 +79,8 @@ export async function POST(req: NextRequest) {
         .order("created_at", { ascending: false });
 
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error("[API]", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
       }
 
       // Build CSV
@@ -137,7 +139,8 @@ export async function POST(req: NextRequest) {
         .eq("user_id", data.user_id);
 
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error("[API]", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
       }
 
       await logAuditEvent({

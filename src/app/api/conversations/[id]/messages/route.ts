@@ -41,7 +41,8 @@ export async function GET(
     .range((page - 1) * limit, page * limit - 1);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[API]", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 
   return NextResponse.json({
@@ -107,7 +108,8 @@ export async function POST(
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[API]", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 
   // Mark conversation as read

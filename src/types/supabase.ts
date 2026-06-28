@@ -516,6 +516,10 @@ export type Database = {
         Args: { p_user_id: string };
         Returns: undefined;
       };
+      get_public_booking_settings: {
+        Args: { p_slug: string };
+        Returns: BookingSettingsRow[];
+      };
     };
     Enums: Record<string, never>;
   };

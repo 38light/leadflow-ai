@@ -109,7 +109,10 @@ export async function PUT(
         .from("profiles")
         .update({ is_active: false, updated_at: new Date().toISOString() })
         .eq("user_id", id);
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      if (error) {
+        console.error("[API]", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+      }
       resultData = { is_active: false };
       break;
     }
@@ -119,7 +122,10 @@ export async function PUT(
         .from("profiles")
         .update({ is_active: true, updated_at: new Date().toISOString() })
         .eq("user_id", id);
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      if (error) {
+        console.error("[API]", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+      }
       resultData = { is_active: true };
       break;
     }
@@ -132,7 +138,10 @@ export async function PUT(
         .from("profiles")
         .update({ subscription_tier: plan, updated_at: new Date().toISOString() })
         .eq("user_id", id);
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      if (error) {
+        console.error("[API]", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+      }
       resultData = { subscription_tier: plan };
       break;
     }

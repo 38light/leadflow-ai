@@ -26,13 +26,14 @@ export async function GET(
 
   const supabase = await createServerClient();
 
-  // Look up booking settings by slug
-  const { data: settings, error: settingsError } = await supabase
-    .from("booking_settings")
-    .select("*")
-    .eq("booking_url_slug", slug)
-    .limit(1)
-    .single();
+  // Look up booking settings by slug via a SECURITY DEFINER RPC (the public
+  // SELECT policy was dropped to stop cross-tenant enumeration — see migration
+  // 20260628000003).
+  const { data: settingsRows, error: settingsError } = await supabase.rpc(
+    "get_public_booking_settings",
+    { p_slug: slug }
+  );
+  const settings = settingsRows?.[0];
 
   if (settingsError || !settings) {
     return NextResponse.json(
