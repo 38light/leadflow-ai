@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type Anthropic from "@anthropic-ai/sdk";
 import { runConcierge } from "./agents/concierge";
 import { runKnowledgeAgent } from "./agents/knowledge";
+import { retrieveRelevantChunks } from "./retrieve";
 import { runActionAgent } from "./agents/action";
 import { composeResponse } from "./response";
 import { executeTool, type ToolContext } from "./tools";
@@ -215,10 +216,15 @@ export async function processInboundMessage(params: ProcessMessageParams): Promi
     }
 
     case "knowledge": {
-      // TODO: Implement vector search when documents are uploaded
+      // Vector search the user's knowledge base for the inbound query.
+      const relevantChunks = await retrieveRelevantChunks(supabase, userId, inboundContent);
       const knowledgeResult = await runKnowledgeAgent(
         claudeMessages,
-        [], // No chunks yet — will be populated when embeddings are ready
+        relevantChunks.map((c) => ({
+          content: c.content,
+          documentId: c.documentId,
+          similarity: c.similarity,
+        })),
         businessName,
         model
       );

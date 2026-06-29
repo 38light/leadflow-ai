@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { getUser } from "@/lib/auth/get-user";
+import { extractText, ingestDocument } from "@/lib/ai/ingest";
 
 export async function GET(
   _request: NextRequest,
@@ -86,7 +87,38 @@ export async function POST(
     return NextResponse.json({ error: docError.message }, { status: 500 });
   }
 
-  // TODO: Phase 3 — trigger document processing (chunking + embedding)
+  // Process the document now: extract text → chunk → embed (local) → store.
+  // Done synchronously so the AI can answer from it immediately. Failures are
+  // recorded on the document row rather than failing the upload.
+  let chunkCount = 0;
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const text = await extractText(buffer, file.type, file.name);
+    const result = await ingestDocument({
+      supabase,
+      userId: user.id,
+      knowledgeBaseId: id,
+      documentId: doc.id,
+      text,
+    });
+    chunkCount = result.chunkCount;
+  } catch (err) {
+    console.error("[API] knowledge ingest failed", err);
+    await supabase
+      .from("knowledge_documents")
+      .update({
+        status: "error",
+        error_message: err instanceof Error ? err.message : "Processing failed",
+      })
+      .eq("id", doc.id);
+    return NextResponse.json(
+      { data: { ...doc, status: "error" }, warning: "Uploaded but text could not be processed." },
+      { status: 201 }
+    );
+  }
 
-  return NextResponse.json({ data: doc }, { status: 201 });
+  return NextResponse.json(
+    { data: { ...doc, status: "ready", chunk_count: chunkCount } },
+    { status: 201 }
+  );
 }

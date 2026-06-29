@@ -1,65 +1,48 @@
-// Embedding generation for knowledge base chunks
-// Uses Voyage AI (Anthropic's recommended embedding partner)
-// Fallback: can be replaced with any embedding API
+// Embedding generation for the knowledge base (RAG).
+//
+// Runs a small open-source model LOCALLY via Transformers.js — no API key, no
+// per-call cost, fully offline after the model downloads once (~90MB, cached).
+// Model: BAAI/bge-small-en-v1.5 (ONNX build) → 384-dimensional vectors.
+//
+// The DB `knowledge_chunks.embedding` column and the match_* RPCs are all
+// vector(384) to match. If you ever change the model, update EMBEDDING_DIMENSIONS
+// AND the column/function dimension together (see supabase/migrations).
 
-const VOYAGE_API_URL = "https://api.voyageai.com/v1/embeddings";
-const EMBEDDING_MODEL = "voyage-3";
-const EMBEDDING_DIMENSIONS = 1536;
+import { pipeline, type FeatureExtractionPipeline } from "@huggingface/transformers";
 
-export async function generateEmbedding(text: string): Promise<number[]> {
-  const apiKey = process.env.VOYAGE_API_KEY;
+const EMBEDDING_MODEL = "Xenova/bge-small-en-v1.5";
+export const EMBEDDING_DIMENSIONS = 384;
 
-  if (!apiKey) {
-    console.warn("[Embeddings] VOYAGE_API_KEY not set — returning zero vector");
-    return new Array(EMBEDDING_DIMENSIONS).fill(0);
+// bge retrieval models work best when the *query* (not the documents) is
+// prefixed with this instruction. Documents are embedded as-is.
+const QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: ";
+
+// Lazy singleton — the model loads once per process and is reused.
+let extractorPromise: Promise<FeatureExtractionPipeline> | null = null;
+
+function getExtractor(): Promise<FeatureExtractionPipeline> {
+  if (!extractorPromise) {
+    extractorPromise = pipeline("feature-extraction", EMBEDDING_MODEL);
   }
-
-  const response = await fetch(VOYAGE_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: EMBEDDING_MODEL,
-      input: text,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Voyage AI embedding failed: ${error}`);
-  }
-
-  const data = await response.json();
-  return data.data[0].embedding;
+  return extractorPromise;
 }
 
+/** Embed a single piece of text (a document chunk). Returns 384 floats. */
+export async function generateEmbedding(text: string): Promise<number[]> {
+  const extractor = await getExtractor();
+  const output = await extractor(text, { pooling: "mean", normalize: true });
+  return Array.from(output.data as Float32Array);
+}
+
+/** Embed a search query (adds the bge query instruction for better recall). */
+export async function generateQueryEmbedding(text: string): Promise<number[]> {
+  return generateEmbedding(QUERY_INSTRUCTION + text);
+}
+
+/** Embed many chunks in one batch. Returns one 384-float vector per input. */
 export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
-  const apiKey = process.env.VOYAGE_API_KEY;
-
-  if (!apiKey) {
-    console.warn("[Embeddings] VOYAGE_API_KEY not set — returning zero vectors");
-    return texts.map(() => new Array(EMBEDDING_DIMENSIONS).fill(0));
-  }
-
-  const response = await fetch(VOYAGE_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: EMBEDDING_MODEL,
-      input: texts,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Voyage AI batch embedding failed: ${error}`);
-  }
-
-  const data = await response.json();
-  return data.data.map((item: { embedding: number[] }) => item.embedding);
+  if (texts.length === 0) return [];
+  const extractor = await getExtractor();
+  const output = await extractor(texts, { pooling: "mean", normalize: true });
+  return output.tolist() as number[][];
 }

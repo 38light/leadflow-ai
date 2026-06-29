@@ -508,6 +508,22 @@ export type Database = {
           similarity: number;
         }[];
       };
+      match_knowledge_chunks_for_user: {
+        Args: {
+          query_embedding: unknown;
+          p_user_id: string;
+          match_threshold?: number;
+          match_count?: number;
+          p_knowledge_base_id?: string | null;
+        };
+        Returns: {
+          id: string;
+          content: string;
+          document_id: string;
+          chunk_index: number;
+          similarity: number;
+        }[];
+      };
       increment_message_count: {
         Args: { p_user_id: string };
         Returns: undefined;

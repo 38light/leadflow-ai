@@ -6,8 +6,9 @@
 > `zpewvydbvijarxpjlwuu`). Vercel hosting can be free tier.
 >
 > The migration chain has been **dry-run end-to-end against a fresh database**
-> (all 24 migrations apply clean, in order, zero errors — 2026-06-28), so step 3
-> is the only DB step and it is known-good.
+> (all migrations apply clean, in order, zero errors — last verified 2026-06-28
+> at 24; one added 2026-06-29 → 25 total), so step 3 is the only DB step and it
+> is known-good.
 
 ## 1. Create the Supabase project
 - Supabase dashboard → org *Nazmul's Insights* → New project.
@@ -28,9 +29,10 @@ supabase link --project-ref <PROJECT_REF>
 ```bash
 supabase db push
 ```
-This applies all 24 files in `supabase/migrations/` in order. The previous
+This applies all 25 files in `supabase/migrations/` in order. The previous
 version-collision blocker is fixed (unique 14-digit versions); a full-chain
-dry-run on a fresh DB passed 24/24.
+dry-run on a fresh DB passed (24 verified 2026-06-28; `20260629000001` added
+after, append-only).
 
 ## 4. (Optional) seed demo data
 Real signups auto-create a `profiles` row via the `handle_new_user` trigger, so
