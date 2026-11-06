@@ -1,19 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import { getUser } from "@/lib/auth/get-user";
+import { getAPIContext } from "@/lib/auth/get-user";
 import { createConversationSchema, conversationFiltersSchema } from "@/lib/validators/conversations";
 
 export async function GET(request: NextRequest) {
-  const user = await getUser();
+  const ctx = await getAPIContext();
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const supabase = await createServerClient();
 
   const params = Object.fromEntries(request.nextUrl.searchParams);
-  const filters = conversationFiltersSchema.parse(params);
+  const parsed = conversationFiltersSchema.safeParse(params);
+  if (!parsed.success) return NextResponse.json({ error: "Invalid conversation filters" }, { status: 400 });
+  const filters = parsed.data;
 
   let query = supabase
     .from("conversations")
     .select("*, contact:contacts(*)", { count: "exact" })
-    .eq("user_id", user.id)
+    .eq("user_id", ctx.ownerId)
     .order("last_message_at", { ascending: false, nullsFirst: false })
     .range((filters.page - 1) * filters.limit, filters.page * filters.limit - 1);
 
@@ -41,7 +44,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getUser();
+  const ctx = await getAPIContext();
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (ctx.teamRole === "viewer") return NextResponse.json({ error: "Read-only team members cannot create conversations" }, { status: 403 });
   const supabase = await createServerClient();
 
   let body;
@@ -59,9 +64,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
+  const { data: contact } = await supabase.from("contacts").select("id").eq("id", input.contact_id).eq("user_id", ctx.ownerId).maybeSingle();
+  if (!contact) return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+  if (input.channel_id) {
+    const { data: channel } = await supabase.from("channels").select("id").eq("id", input.channel_id).eq("user_id", ctx.ownerId).maybeSingle();
+    if (!channel) return NextResponse.json({ error: "Channel not found" }, { status: 404 });
+  }
   const { data, error } = await supabase
     .from("conversations")
-    .insert({ ...input, user_id: user.id })
+    .insert({ ...input, user_id: ctx.ownerId })
     .select("*, contact:contacts(*)")
     .single();
 

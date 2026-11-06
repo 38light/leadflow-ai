@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SearchInput } from "@/components/ui/search-input";
@@ -11,6 +11,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Brain, X } from "lucide-react";
 import { LEAD_STATUSES, TEMPERATURES } from "@/constants/app";
 import type { Contact } from "@/types";
+import type { FollowUp } from "@/types/today";
+
+type ContactWithNextStep = Contact & { follow_ups?: Pick<FollowUp, "id" | "title" | "due_at" | "assigned_to">[] };
 
 interface PaginationMeta {
   page: number;
@@ -69,7 +72,9 @@ export function ContactsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contacts, setContacts] = useState<ContactWithNextStep[]>([]);
+  const [loadError, setLoadError] = useState("");
+  const requestSequence = useRef(0);
   const [pagination, setPagination] = useState<PaginationMeta>({
     page: 1,
     limit: 25,
@@ -97,7 +102,9 @@ export function ContactsPageInner() {
   const [diagnosisError, setDiagnosisError] = useState<string | null>(null);
 
   const fetchContacts = useCallback(async () => {
+    const sequence = ++requestSequence.current;
     setLoading(true);
+    setLoadError("");
     try {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
@@ -109,17 +116,21 @@ export function ContactsPageInner() {
       const res = await fetch(`/api/contacts?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch contacts");
       const json = await res.json();
+      if (sequence !== requestSequence.current) return;
       setContacts(json.data ?? []);
       setPagination(json.pagination);
     } catch {
+      if (sequence !== requestSequence.current) return;
       setContacts([]);
+      setLoadError("Could not load contacts. Please try again.");
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current) setLoading(false);
     }
   }, [search, status, temperature, page]);
 
   useEffect(() => {
     fetchContacts();
+    return () => { requestSequence.current += 1; };
   }, [fetchContacts]);
 
   // Sync state to URL
@@ -218,6 +229,7 @@ export function ContactsPageInner() {
         />
       </div>
 
+      {loadError && <div role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-800">{loadError} <button type="button" className="underline" onClick={() => void fetchContacts()}>Retry</button></div>}
       <div className="bg-white border rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -242,7 +254,7 @@ export function ContactsPageInner() {
                   Score
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Created
+                  Next step
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   AI
@@ -330,7 +342,9 @@ export function ContactsPageInner() {
                           <ScorePill score={contact.score ?? 0} />
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500">
-                          {new Date(contact.created_at).toLocaleDateString()}
+                          <Link href={`/contacts/${contact.id}`} className="block min-w-40 max-w-64 hover:text-blue-600">
+                            {contact.follow_ups?.[0] ? <><span className="block truncate font-medium text-gray-800">{contact.follow_ups[0].title}</span><span className="text-xs">Due {new Date(contact.follow_ups[0].due_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}</span></> : <span className="text-blue-600">Set next step</span>}
+                          </Link>
                         </td>
                         <td className="px-4 py-3">
                           {canDiagnose && (
@@ -355,7 +369,7 @@ export function ContactsPageInner() {
           </table>
         </div>
 
-        {!loading && contacts.length === 0 && (
+      {!loading && !loadError && contacts.length === 0 && (
           <EmptyState
             icon={<Users className="h-10 w-10" />}
             title="No contacts found"

@@ -2,6 +2,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   typedRoutes: true,
+  turbopack: { root: process.cwd() },
+  webpack(config, { dev }) {
+    // Production builds don't need the filesystem pack cache. Keeping it off
+    // also avoids large-string serialization and path-rename cache problems.
+    if (!dev) config.cache = false;
+    return config;
+  },
   images: {
     remotePatterns: [],
   },

@@ -10,6 +10,8 @@ import { useToast } from "@/components/ui/toast";
 import { LEAD_STATUSES, TEMPERATURES } from "@/constants/app";
 import type { Contact, Conversation } from "@/types";
 import { JourneyTimeline } from "@/components/contacts/journey-timeline";
+import { FollowUpsPanel } from "@/components/contacts/follow-ups-panel";
+import Link from "next/link";
 
 const STATUS_OPTIONS = LEAD_STATUSES.map((s) => ({
   value: s.value,
@@ -276,6 +278,8 @@ export default function ContactDetailPage() {
         </div>
       </div>
 
+      <FollowUpsPanel key={contactId} contactId={contactId} />
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white border rounded-lg p-6">
           <h2 className="font-semibold mb-4">Details</h2>
@@ -309,15 +313,16 @@ export default function ContactDetailPage() {
           </h2>
           <div className="space-y-2">
             {conversations.map((conv) => (
-              <div
+              <Link
                 key={conv.id}
-                className="p-3 border rounded hover:bg-gray-50"
+                href={`/conversations/${conv.id}`}
+                className="block p-3 border rounded hover:bg-gray-50"
               >
                 <p className="text-sm font-medium">{conv.channel_type}</p>
                 <p className="text-xs text-gray-500">
                   {conv.status} &middot; {conv.unread_count ?? 0} unread
                 </p>
-              </div>
+              </Link>
             ))}
             {conversations.length === 0 && (
               <p className="text-sm text-gray-400">No conversations yet.</p>

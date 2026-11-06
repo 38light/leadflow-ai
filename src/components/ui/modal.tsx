@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 type ModalSize = "sm" | "md" | "lg" | "xl";
@@ -23,6 +23,9 @@ const sizeStyles: Record<ModalSize, string> = {
 
 export function Modal({ open, onClose, title, children, size = "md" }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -33,7 +36,7 @@ export function Modal({ open, onClose, title, children, size = "md" }: ModalProp
     } else {
       dialog.close();
     }
-  }, [open]);
+  }, [open, mounted]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -45,7 +48,7 @@ export function Modal({ open, onClose, title, children, size = "md" }: ModalProp
 
     dialog.addEventListener("close", handleClose);
     return () => dialog.removeEventListener("close", handleClose);
-  }, [onClose]);
+  }, [onClose, mounted]);
 
   function handleBackdropClick(e: React.MouseEvent<HTMLDialogElement>) {
     if (e.target === dialogRef.current) {
@@ -53,7 +56,7 @@ export function Modal({ open, onClose, title, children, size = "md" }: ModalProp
     }
   }
 
-  if (typeof window === "undefined") return null;
+  if (!mounted) return null;
 
   return createPortal(
     <dialog

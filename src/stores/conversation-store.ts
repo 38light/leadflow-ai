@@ -23,7 +23,9 @@ export const useConversationStore = create<ConversationStore>((set) => ({
   setActiveConversation: (id) => set({ activeConversationId: id }),
   setMessages: (messages) => set({ messages }),
   addMessage: (message) =>
-    set((state) => ({ messages: [...state.messages, message] })),
+    set((state) => ({ messages: state.messages.some(existing => existing.id === message.id)
+      ? state.messages.map(existing => existing.id === message.id ? message : existing)
+      : [...state.messages, message] })),
   setLoadingMessages: (loading) => set({ isLoadingMessages: loading }),
   reset: () =>
     set({

@@ -15,6 +15,7 @@ interface ConversationThreadProps {
   contact: { name: string | null; email: string | null };
   channel: string;
   isAiEnabled: boolean;
+  canReply?: boolean;
 }
 
 function MessageBubble({ msg }: { msg: Message }) {
@@ -103,6 +104,7 @@ export function ConversationThread({
   contact,
   channel,
   isAiEnabled,
+  canReply = true,
 }: ConversationThreadProps) {
   const { messages, setMessages, setActiveConversation, addMessage } =
     useConversationStore();
@@ -111,16 +113,49 @@ export function ConversationThread({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [aiActive, setAiActive] = useState(isAiEnabled);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState(false);
+  const pendingRequest = useRef<{ id: string; content: string } | null>(null);
+  const writable = canReply && channel === "web_chat";
 
   // Initialise store once on mount
   useEffect(() => {
     setActiveConversation(conversationId);
     setMessages(initialMessages);
+    setAiActive(isAiEnabled);
+    pendingRequest.current = null;
+    setText("");
+    setSendError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
   // Subscribe to realtime inserts
   useRealtimeMessages(conversationId);
+
+  // Polling also works when realtime is unavailable (including local dev auth).
+  useEffect(() => {
+    let cancelled = false;
+    let inFlight = false;
+    async function refresh() {
+      if (inFlight || document.visibilityState !== "visible") return;
+      inFlight = true;
+      try {
+        const res = await fetch(`/api/conversations/${conversationId}/messages?limit=100&latest=true`, { cache: "no-store" });
+        const json = await res.json();
+        if (!res.ok) throw new Error("Unable to refresh messages");
+        if (!cancelled && useConversationStore.getState().activeConversationId === conversationId) {
+          const merged = new Map(useConversationStore.getState().messages.map(message => [message.id, message]));
+          (json.data as Message[]).forEach(message => merged.set(message.id, message));
+          setMessages([...merged.values()].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id)));
+          setSyncError(false);
+        }
+      } catch { if (!cancelled) setSyncError(true); }
+      finally { inFlight = false; }
+    }
+    const interval = window.setInterval(() => void refresh(), 5000);
+    return () => { cancelled = true; window.clearInterval(interval); };
+  }, [conversationId, setMessages]);
 
   // Auto-scroll to bottom whenever messages change
   useEffect(() => {
@@ -129,56 +164,35 @@ export function ConversationThread({
 
   const handleSend = useCallback(async () => {
     const content = text.trim();
-    if (!content || isSending) return;
-
-    // Optimistic update — create a local message to show immediately
-    const tempMessage: Message = {
-      id: crypto.randomUUID(),
-      user_id: "",
-      conversation_id: conversationId,
-      contact_id: "",
-      direction: "outbound",
-      sender_type: "human",
-      content,
-      content_type: "text",
-      channel_type: channel,
-      external_message_id: null,
-      media_url: null,
-      media_storage_path: null,
-      ai_model: null,
-      ai_confidence: null,
-      ai_tokens_used: null,
-      metadata: {},
-      delivered_at: null,
-      read_at: null,
-      created_at: new Date().toISOString(),
-    };
-
-    addMessage(tempMessage);
-    setText("");
+    if (!content || isSending || !writable) return;
+    const pending = pendingRequest.current?.content === content ? pendingRequest.current : { id: crypto.randomUUID(), content };
+    pendingRequest.current = pending;
+    setSendError(null);
     setIsSending(true);
 
     try {
       const res = await fetch(`/api/conversations/${conversationId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, role: "user" }),
+        body: JSON.stringify({ content, client_message_id: pending.id }),
       });
 
+      const json = await res.json();
       if (!res.ok) {
-        const json = (await res.json()) as { error?: string };
         throw new Error(json.error ?? "Failed to send message");
       }
+      if (useConversationStore.getState().activeConversationId === conversationId) {
+        addMessage(json.data as Message);
+        setText("");
+        setAiActive(false);
+        pendingRequest.current = null;
+      }
+      toast("Reply available in the visitor's chat", "success");
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to send message";
       toast(message, "error");
-      // Remove the optimistic message on failure
-      setMessages(
-        useConversationStore
-          .getState()
-          .messages.filter((m) => m.id !== tempMessage.id)
-      );
+      setSendError(message);
     } finally {
       setIsSending(false);
     }
@@ -186,9 +200,8 @@ export function ConversationThread({
     text,
     isSending,
     conversationId,
-    channel,
+    writable,
     addMessage,
-    setMessages,
     toast,
   ]);
 
@@ -223,18 +236,19 @@ export function ConversationThread({
           <span
             className={cn(
               "text-xs px-2 py-1 rounded-full font-medium",
-              isAiEnabled
+              aiActive
                 ? "bg-green-100 text-green-800"
                 : "bg-gray-100 text-gray-600"
             )}
           >
-            {isAiEnabled ? "AI Active" : "Human Mode"}
+            {aiActive ? "AI Active" : "Human Mode"}
           </span>
         </div>
       </div>
 
       {/* Message list */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+        {syncError && <p role="status" className="text-sm text-amber-700">Live updates are delayed. Retrying automatically.</p>}
         {messages.length === 0 ? (
           <p className="text-center text-gray-400 py-8 text-sm">
             No messages in this conversation yet.
@@ -247,6 +261,8 @@ export function ConversationThread({
 
       {/* Input area */}
       <div className="px-4 py-3 border-t bg-white shrink-0">
+        {sendError && <p role="alert" className="mb-2 text-sm text-red-700">{sendError}</p>}
+        {!writable && <p className="mb-2 text-sm text-gray-600">{canReply ? "Live replies are currently available for web chat only." : "You have read-only access to this conversation."}</p>}
         <div className="flex items-end gap-2">
           <textarea
             ref={textareaRef}
@@ -255,7 +271,8 @@ export function ConversationThread({
             onKeyDown={handleKeyDown}
             placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
             rows={2}
-            disabled={isSending}
+            disabled={isSending || !writable}
+            maxLength={10000}
             className={cn(
               "flex-1 resize-none rounded-xl border border-gray-300 px-4 py-2.5 text-sm",
               "placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500",
@@ -265,7 +282,7 @@ export function ConversationThread({
           />
           <button
             onClick={() => void handleSend()}
-            disabled={!text.trim() || isSending}
+            disabled={!text.trim() || isSending || !writable}
             aria-label="Send message"
             className={cn(
               "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors",
@@ -277,7 +294,7 @@ export function ConversationThread({
           </button>
         </div>
         <p className="mt-1.5 text-xs text-gray-400">
-          Shift+Enter for new line
+          {isSending ? "Sending reply…" : "Sending a reply switches this conversation to human mode."}
         </p>
       </div>
     </div>

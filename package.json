@@ -6,9 +6,10 @@
     "dev": "next dev --turbopack -p 3004",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint src --max-warnings 0",
     "type-check": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "node scripts/verify-daily-workflow.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

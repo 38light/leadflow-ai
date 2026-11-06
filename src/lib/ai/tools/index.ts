@@ -14,11 +14,14 @@ export async function executeTool(
 ): Promise<unknown> {
   switch (toolName) {
     case "check_calendar":
-      return executeCheckCalendar(toolInput);
     case "book_appointment":
-      return executeBookAppointment(toolInput);
     case "generate_payment_link":
-      return executeGeneratePaymentLink(toolInput);
+      await executeEscalateToHuman({ reason: "A team member must confirm availability, bookings and payment requests." }, context);
+      return {
+        success: false,
+        requiresHuman: true,
+        error: "This action is not connected. No availability was checked, no booking was created and no payment link was generated. A team member must complete the request. Do not claim success.",
+      };
     case "update_contact":
       return executeUpdateContact(toolInput, context);
     case "search_knowledge":
@@ -28,43 +31,6 @@ export async function executeTool(
     default:
       return { error: `Unknown tool: ${toolName}` };
   }
-}
-
-async function executeCheckCalendar(input: Record<string, unknown>) {
-  const date = input.date as string;
-  // TODO: Phase 5 — integrate with real calendar API
-  return {
-    date,
-    available: true,
-    slots: [
-      { time: "09:00", available: true },
-      { time: "10:00", available: true },
-      { time: "14:00", available: true },
-      { time: "15:00", available: true },
-    ],
-  };
-}
-
-async function executeBookAppointment(input: Record<string, unknown>) {
-  // TODO: Phase 5 — create real calendar event
-  return {
-    booked: true,
-    date: input.date,
-    time: input.start_time,
-    title: input.title,
-    confirmation: `Appointment booked for ${input.contact_name} on ${input.date} at ${input.start_time}.`,
-  };
-}
-
-async function executeGeneratePaymentLink(input: Record<string, unknown>) {
-  const amountAud = input.amount_aud as number;
-  // TODO: Phase 5 — generate real Stripe payment link
-  return {
-    url: `${process.env.NEXT_PUBLIC_APP_URL}/pay/placeholder`,
-    amount: amountAud,
-    currency: "AUD",
-    description: input.description,
-  };
 }
 
 async function executeUpdateContact(

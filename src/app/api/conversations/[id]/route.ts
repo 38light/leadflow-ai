@@ -1,21 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import { getUser } from "@/lib/auth/get-user";
+import { getAPIContext } from "@/lib/auth/get-user";
 import { updateConversationSchema } from "@/lib/validators/conversations";
+import { z } from "zod";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await getUser();
+  const ctx = await getAPIContext();
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const supabase = await createServerClient();
   const { id } = await params;
+  if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Invalid conversation id" }, { status: 400 });
 
   const { data, error } = await supabase
     .from("conversations")
     .select("*, contact:contacts(*)")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", ctx.ownerId)
     .single();
 
   if (error) {
@@ -29,9 +32,12 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await getUser();
+  const ctx = await getAPIContext();
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (ctx.teamRole === "viewer") return NextResponse.json({ error: "Read-only team members cannot edit conversations" }, { status: 403 });
   const supabase = await createServerClient();
   const { id } = await params;
+  if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Invalid conversation id" }, { status: 400 });
 
   let body;
   try {
@@ -52,7 +58,7 @@ export async function PUT(
     .from("conversations")
     .update(input)
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", ctx.ownerId)
     .select("*, contact:contacts(*)")
     .single();
 

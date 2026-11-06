@@ -1,12 +1,17 @@
-import { getUser } from "@/lib/auth/get-user";
+import { getAuthContext } from "@/lib/auth/get-user";
 import { CopyEmbedCode } from "@/components/settings/copy-embed-code";
+import { headers } from "next/headers";
 
 export default async function WidgetSettingsPage() {
-  const user = await getUser();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://yourapp.com";
-  const embedSrc = `${appUrl}/api/widget/${user.id}`;
+  const ctx = await getAuthContext();
+  const requestHeaders = await headers();
+  const host = requestHeaders.get("host");
+  const localHost = host && /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host) ? host : null;
+  const appUrl = process.env.NODE_ENV === "development" && localHost
+    ? `http://${localHost}` : process.env.NEXT_PUBLIC_APP_URL ?? "https://yourapp.com";
+  const embedSrc = `${appUrl}/api/widget/${ctx.ownerId}`;
   const embedCode = `<script src="${embedSrc}" defer></script>`;
-  const previewUrl = `${appUrl}/chat-widget/${user.id}`;
+  const previewUrl = `/chat-widget/${ctx.ownerId}`;
 
   return (
     <div className="max-w-2xl space-y-8">
@@ -54,7 +59,7 @@ export default async function WidgetSettingsPage() {
           </li>
           <li className="flex gap-3">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">2</span>
-            <span>Your AI agent (powered by Claude) responds instantly using your knowledge base</span>
+            <span>Your AI agent responds using your knowledge base, or queues a draft when approval is required</span>
           </li>
           <li className="flex gap-3">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">3</span>
@@ -62,7 +67,7 @@ export default async function WidgetSettingsPage() {
           </li>
           <li className="flex gap-3">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">4</span>
-            <span>If they book a meeting, their pipeline stage advances to <strong>Qualified</strong> automatically</span>
+            <span>Review and send replies from Today or the inbox; visitors receive them in the same chat</span>
           </li>
           <li className="flex gap-3">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">5</span>

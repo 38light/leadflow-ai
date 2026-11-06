@@ -49,11 +49,14 @@ async function loadProfileQualitySettings(
   supabase: SupabaseClient,
   userId: string
 ): Promise<ProfileQualityFields> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .select("ai_confidence_threshold, require_approval, ai_memory_depth, default_language")
     .eq("user_id", userId)
     .single();
+
+  // Never default to sending automatically when the approval policy cannot be read.
+  if (error || !data) throw new Error("Unable to load AI approval settings");
 
   const profile = (data ?? null) as ProfileQualityFields | null;
   return {
@@ -140,6 +143,7 @@ export async function processInboundMessage(params: ProcessMessageParams): Promi
 
     if (optOutError) {
       console.error("[Orchestrator] Failed to mark contact as opted out:", optOutError);
+      throw new Error("Unable to save contact preference");
     }
 
     return {
@@ -315,6 +319,7 @@ export async function processInboundMessage(params: ProcessMessageParams): Promi
 
     if (approvalError) {
       console.error("[Orchestrator] Failed to create approval record:", approvalError);
+      throw new Error("Unable to queue reply for approval");
     } else if (approvalRow) {
       approvalId = (approvalRow as { id: string }).id;
     }

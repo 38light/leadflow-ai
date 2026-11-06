@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
+import { z } from "zod";
 
 /**
  * GET /api/widget/[businessId]
@@ -13,16 +14,19 @@ import { createAdminClient } from "@/lib/supabase/server";
  * Security: no innerHTML used — all DOM nodes built with createElement/setAttribute/textContent.
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ businessId: string }> }
 ) {
   const { businessId } = await params;
+  if (!z.string().uuid().safeParse(businessId).success) {
+    return new NextResponse("// Invalid business id", { status: 400 });
+  }
 
   const supabase = createAdminClient();
   const { data: profile } = await supabase
     .from("profiles")
     .select("id, business_name")
-    .eq("id", businessId)
+    .eq("user_id", businessId)
     .single();
 
   if (!profile) {
@@ -32,7 +36,9 @@ export async function GET(
     });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3004";
+  const appUrl = process.env.NODE_ENV === "development"
+    ? request.nextUrl.origin
+    : (process.env.NEXT_PUBLIC_APP_URL ?? request.nextUrl.origin);
   // widgetUrl is server-controlled (not user input), safe to embed
   const widgetUrl = `${appUrl}/chat-widget/${encodeURIComponent(businessId)}`;
 
@@ -41,7 +47,7 @@ export async function GET(
   if (window.__LeadFlowWidget) return;
   window.__LeadFlowWidget = true;
 
-  var WIDGET_URL = '${widgetUrl}';
+  var WIDGET_URL = ${JSON.stringify(widgetUrl)};
   var isOpen = false;
 
   /* ---- Styles ---- */
@@ -133,6 +139,7 @@ export async function GET(
   btn.addEventListener('click', function() { isOpen ? closeWidget() : openWidget(); });
 
   window.addEventListener('message', function(e) {
+    if (e.source !== iframe.contentWindow || e.origin !== new URL(WIDGET_URL).origin) return;
     if (e.data === 'lf:close') closeWidget();
     if (e.data === 'lf:open')  openWidget();
   });

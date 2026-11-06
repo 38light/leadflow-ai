@@ -1,183 +1,86 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/server";
-import { findOrCreateContact } from "@/lib/contacts/find-or-create";
-import { findOrCreateWebChatConversation } from "@/lib/conversations/find-or-create";
 import { processInboundMessage } from "@/lib/ai/orchestrator";
 import { rateLimitChatMessage, rateLimitByIp } from "@/lib/rate-limit/chat";
+import { getChatSession, hashSessionToken, publicReply, sessionCredentialsSchema } from "@/lib/chat/session";
+import { isOptOutMessage } from "@/lib/ai/prompts/response-rules";
 
-/**
- * POST /api/chat/message
- *
- * PUBLIC endpoint — no auth required.
- * Receives a message from the web chat widget, processes it through the
- * AI orchestrator, persists both the inbound and outbound messages, and
- * returns the AI response.
- *
- * Rate limited via Upstash: 30 messages/session/minute (degrades to allow-all when env vars absent).
- */
-
-const messageSchema = z.object({
-  sessionId: z.string().min(1, "sessionId is required"),
-  content: z.string().min(1, "content is required").max(5000, "content must be under 5000 characters"),
-  businessId: z.string().min(1, "businessId is required"),
-  senderName: z.string().max(100).optional(),
-  senderEmail: z.string().email().optional(),
-  senderPhone: z.string().max(30).optional(),
+const messageSchema = sessionCredentialsSchema.extend({
+  clientMessageId: z.string().uuid(),
+  content: z.string().trim().min(1).max(5000),
+  senderName: z.string().trim().max(100).optional(),
+  senderEmail: z.string().email().max(254).optional(),
 });
 
 export async function POST(request: NextRequest) {
   try {
-    const body: unknown = await request.json();
-
-    const parsed = messageSchema.safeParse(body);
-    if (!parsed.success) {
-      const firstError = parsed.error.issues[0]?.message ?? "Invalid input";
-      return NextResponse.json({ error: firstError }, { status: 400 });
-    }
-
-    const { sessionId, content, businessId, senderName, senderEmail, senderPhone } = parsed.data;
-
-    // Per-IP cap first — sessionId is attacker-chosen and rotatable, so the
-    // per-session limit alone does not bound AI cost / DB-write abuse.
-    const ipRl = await rateLimitByIp(request, "chat:msg:ip", 60, 60);
-    const rl = await rateLimitChatMessage(sessionId);
-    if (!ipRl.allowed || !rl.allowed) {
-      const reset = Math.max(ipRl.reset, rl.reset);
-      return NextResponse.json(
-        { error: "Message limit reached. Please wait before sending more messages." },
-        {
-          status: 429,
-          headers: { "Retry-After": String(Math.max(0, reset - Math.floor(Date.now() / 1000))) },
-        }
-      );
-    }
-
+    const parsed = messageSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) return NextResponse.json({ error: "Invalid chat message" }, { status: 400 });
+    const { sessionId, businessId, clientMessageId, content, senderName, senderEmail } = parsed.data;
+    const [ipRate, sessionRate] = await Promise.all([
+      rateLimitByIp(request, "chat:msg:ip", 60, 60),
+      rateLimitChatMessage(hashSessionToken(sessionId)),
+    ]);
+    if (!ipRate.allowed || !sessionRate.allowed) return NextResponse.json({ error: "Message limit reached. Please wait." }, { status: 429 });
     const supabase = createAdminClient();
-
-    // 1. Verify business exists and fetch profile info for AI context
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("id, business_name, business_type")
-      .eq("id", businessId)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json({ error: "Business not found" }, { status: 404 });
+    const session = await getChatSession(supabase, businessId, sessionId);
+    if (!session) return NextResponse.json({ error: "Chat session expired. Start a new chat." }, { status: 401 });
+    const { data: profile, error: profileError } = await supabase.from("profiles")
+      .select("business_name, business_type, ai_enabled").eq("user_id", businessId).single();
+    if (profileError || !profile) throw profileError ?? new Error("Business unavailable");
+    const { data: accepted, error: acceptError } = await supabase.rpc("receive_web_chat_message", {
+      p_owner_id: businessId, p_token_hash: hashSessionToken(sessionId), p_request_id: clientMessageId,
+      p_content: content, p_name: senderName ?? null, p_email: senderEmail ?? null,
+    });
+    if (acceptError || !accepted) throw acceptError ?? new Error("Message not accepted");
+    const receipt = { messageId: accepted.message_id as string, clientMessageId, accepted: true };
+    // A retry acknowledges the original message; it never calls the AI twice.
+    const isOptOut = isOptOutMessage(content);
+    if (accepted.duplicate || ((!accepted.is_ai_active || !profile.ai_enabled) && !isOptOut)) {
+      return NextResponse.json({ data: { ...receipt, status: "awaiting_reply" } }, { headers: { "Cache-Control": "no-store" } });
     }
-
-    // 2. Find or create contact — deduplicates across channels by phone/email
-    const { contactId, isNew: isNewContact } = await findOrCreateContact({
-      userId: businessId,
-      supabase,
-      name: senderName,
-      email: senderEmail,
-      phone: senderPhone,
-      sourceChannel: "web_chat",
-      externalId: sessionId,
-    });
-
-    // 3. Mark contact temperature as warm on inbound message
-    if (!isNewContact) {
-      await supabase
-        .from("contacts")
-        .update({ temperature: "warm" })
-        .eq("id", contactId)
-        .eq("temperature", "cold");
-    }
-
-    // 4. Find or create conversation for this session
-    const { conversationId, isNew: isNewConversation } = await findOrCreateWebChatConversation({
-      userId: businessId,
-      contactId,
-      sessionId,
-      supabase,
-    });
-
-    const now = new Date().toISOString();
-
-    // 5. Persist inbound message
-    await supabase.from("messages").insert({
-      conversation_id: conversationId,
-      user_id: businessId,
-      contact_id: contactId,
-      channel_type: "web_chat",
-      direction: "inbound",
-      sender_type: "contact",
-      content,
-      content_type: "text",
-      created_at: now,
-    });
-
-    // 6. Update conversation last_message_at
-    await supabase
-      .from("conversations")
-      .update({ last_message_at: now })
-      .eq("id", conversationId);
-
-    // 7. Fetch recent conversation history for AI context
-    const { data: historyRows } = await supabase
-      .from("messages")
-      .select("direction, content")
-      .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true })
-      .limit(20);
-
-    // Exclude the message we just inserted (orchestrator appends current inbound itself)
-    const conversationHistory = (historyRows ?? [])
-      .slice(0, -1)
-      .map((m) => ({
-        role: m.direction === "inbound" ? "inbound" : "assistant",
-        content: m.content as string,
-      }));
-
-    // 8. Process through AI orchestrator
-    const aiResult = await processInboundMessage({
-      inboundContent: content,
-      conversationId,
-      contactId,
-      userId: businessId,
-      channelType: "web_chat",
-      conversationHistory,
-      businessName: profile.business_name ?? "Business",
-      businessType: (profile.business_type as string) ?? "general",
-      isFirstMessage: isNewConversation,
-      supabase,
-    });
-
-    // 9. Persist AI outbound message
-    if (aiResult.shouldSend) {
-      const outboundNow = new Date().toISOString();
-      await supabase.from("messages").insert({
-        conversation_id: conversationId,
-        user_id: businessId,
-        contact_id: contactId,
-        channel_type: "web_chat",
-        direction: "outbound",
-        sender_type: "ai",
-        content: aiResult.responseContent,
-        content_type: "text",
-        ai_model: "claude-sonnet-4-20250514",
-        ai_confidence: 0.9,
-        ai_tokens_used: aiResult.totalInputTokens + aiResult.totalOutputTokens,
-        created_at: outboundNow,
+    // The message is durable. AI failures leave it available for a human.
+    try {
+      const { data: contact, error: contactError } = await supabase.from("contacts")
+        .select("opted_out").eq("id", accepted.contact_id).eq("user_id", businessId).single();
+      if (contactError) throw contactError;
+      if (contact?.opted_out && !isOptOut) return NextResponse.json({ data: { ...receipt, status: "awaiting_reply" } }, { headers: { "Cache-Control": "no-store" } });
+      const { data: rows, error: historyError } = await supabase.from("messages")
+        .select("id, direction, content, created_at")
+        .eq("conversation_id", accepted.conversation_id).eq("user_id", businessId)
+        .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(21);
+      if (historyError) throw historyError;
+      const history = (rows ?? []).filter(row => row.id !== accepted.message_id).reverse()
+        .map(row => ({ role: row.direction === "inbound" ? "inbound" : "assistant", content: row.content ?? "" }));
+      const result = await processInboundMessage({
+        inboundContent: content, conversationId: accepted.conversation_id, contactId: accepted.contact_id,
+        userId: businessId, channelType: "web_chat", conversationHistory: history,
+        businessName: profile.business_name ?? "Business", businessType: profile.business_type ?? "general",
+        isFirstMessage: accepted.is_first_message, supabase,
       });
-
-      await supabase
-        .from("conversations")
-        .update({ last_message_at: outboundNow })
-        .eq("id", conversationId);
+      const reply = publicReply(result);
+      let published = false;
+      if (reply) {
+        const { data, error } = await supabase.rpc("publish_web_chat_ai_reply", {
+          p_owner_id: businessId, p_conversation_id: accepted.conversation_id,
+          p_inbound_id: accepted.message_id, p_content: reply, p_is_opt_out: result.isOptOut,
+        });
+        if (error) throw error;
+        published = data === true;
+      }
+      return NextResponse.json({ data: { ...receipt, status: published ? "replied" : "awaiting_reply" } }, { headers: { "Cache-Control": "no-store" } });
+    } catch (error) {
+      console.error("[Chat AI] Accepted message needs human reply", error);
+      const { error: handoffError } = await supabase.from("conversations").update({
+        is_ai_active: false, ai_handoff_reason: "Automatic reply unavailable. A team member needs to reply.",
+        handoff_at: new Date().toISOString(),
+      }).eq("id", accepted.conversation_id).eq("user_id", businessId);
+      if (handoffError) console.error("[Chat AI] Could not record handoff", handoffError);
+      return NextResponse.json({ data: { ...receipt, status: "awaiting_reply" } }, { status: 202, headers: { "Cache-Control": "no-store" } });
     }
-
-    return NextResponse.json({
-      data: {
-        message: aiResult.responseContent,
-        sessionId,
-        isOptOut: aiResult.isOptOut,
-      },
-    });
   } catch (error) {
-    console.error("[Chat Message] Error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("[Chat Message]", error);
+    return NextResponse.json({ error: "Unable to send message. You can retry safely." }, { status: 500 });
   }
 }

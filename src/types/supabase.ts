@@ -3,6 +3,18 @@
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
+type FollowUpRow = Omit<import("./today").FollowUp, "contact">;
+
+interface WebChatSessionRow {
+  id: string;
+  user_id: string;
+  token_hash: string;
+  conversation_id: string | null;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface ProfileRow {
   id: string;
   user_id: string;
@@ -483,6 +495,18 @@ export type Database = {
         Update: Partial<BookingRow>;
         Relationships: [];
       };
+      web_chat_sessions: {
+        Row: WebChatSessionRow;
+        Insert: Partial<WebChatSessionRow> & { user_id: string; token_hash: string };
+        Update: Partial<WebChatSessionRow>;
+        Relationships: [];
+      };
+      follow_ups: {
+        Row: FollowUpRow;
+        Insert: Partial<FollowUpRow> & { user_id: string; contact_id: string; title: string; due_at: string; assigned_to: string };
+        Update: Partial<FollowUpRow>;
+        Relationships: [];
+      };
       ai_approvals: {
         Row: AIApprovalRow;
         Insert: Partial<AIApprovalRow> & { user_id: string; draft_content: string };
@@ -492,6 +516,34 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      receive_web_chat_message: {
+        Args: { p_owner_id: string; p_token_hash: string; p_request_id: string; p_content: string; p_name?: string | null; p_email?: string | null };
+        Returns: Json;
+      };
+      act_on_web_chat_approval: {
+        Args: { p_owner_id: string; p_actor_id: string; p_approval_id: string; p_action: string; p_content?: string | null };
+        Returns: Json;
+      };
+      send_web_chat_reply: {
+        Args: { p_owner_id: string; p_actor_id: string; p_conversation_id: string; p_request_id: string; p_content: string };
+        Returns: Json;
+      };
+      publish_web_chat_ai_reply: {
+        Args: { p_owner_id: string; p_conversation_id: string; p_inbound_id: string; p_content: string; p_is_opt_out?: boolean };
+        Returns: boolean;
+      };
+      today_timezone: {
+        Args: { p_owner_id: string };
+        Returns: string | null;
+      };
+      follow_up_assignees: {
+        Args: { p_owner_id: string };
+        Returns: { id: string; name: string }[];
+      };
+      today_needs_reply: {
+        Args: { p_owner_id: string; p_limit?: number };
+        Returns: { id: string; contact_id: string; contact_name: string; channel: string; last_message_at: string; preview: string; total_count: number }[];
+      };
       match_knowledge_chunks: {
         Args: {
           query_embedding: unknown;

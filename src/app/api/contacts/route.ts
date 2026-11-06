@@ -1,21 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import { getUser } from "@/lib/auth/get-user";
+import { getAPIContext } from "@/lib/auth/get-user";
 import { createContactSchema, contactFiltersSchema } from "@/lib/validators/contacts";
 import { deliverWebhookEvent } from "@/lib/webhooks/deliver";
 import { sendSlackNotification } from "@/lib/integrations/slack";
 
 export async function GET(request: NextRequest) {
-  const user = await getUser();
+  const ctx = await getAPIContext();
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const supabase = await createServerClient();
 
   const params = Object.fromEntries(request.nextUrl.searchParams);
-  const filters = contactFiltersSchema.parse(params);
+  const parsed = contactFiltersSchema.safeParse(params);
+  if (!parsed.success) return NextResponse.json({ error: "Invalid contact filters" }, { status: 400 });
+  const filters = parsed.data;
 
   let query = supabase
     .from("contacts")
-    .select("*", { count: "exact" })
-    .eq("user_id", user.id)
+    .select("*, follow_ups(id, title, due_at, assigned_to)", { count: "exact" })
+    .eq("user_id", ctx.ownerId)
+    .eq("follow_ups.status", "pending")
+    .order("due_at", { referencedTable: "follow_ups", ascending: true })
+    .limit(1, { referencedTable: "follow_ups" })
     .order("created_at", { ascending: false })
     .range((filters.page - 1) * filters.limit, filters.page * filters.limit - 1);
 
@@ -23,7 +29,8 @@ export async function GET(request: NextRequest) {
   if (filters.temperature) query = query.eq("temperature", filters.temperature);
   if (filters.source_channel) query = query.eq("source_channel", filters.source_channel);
   if (filters.search) {
-    query = query.or(`name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,company.ilike.%${filters.search}%`);
+    const search = filters.search.replace(/[,().%_*\\]/g, " ").trim();
+    if (search) query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`);
   }
 
   const { data, error, count } = await query;
@@ -45,7 +52,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getUser();
+  const ctx = await getAPIContext();
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (ctx.teamRole === "viewer") return NextResponse.json({ error: "Read-only team members cannot create contacts" }, { status: 403 });
   const supabase = await createServerClient();
 
   let body;
@@ -65,7 +74,7 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("contacts")
-    .insert({ ...input, user_id: user.id })
+    .insert({ ...input, user_id: ctx.ownerId })
     .select()
     .single();
 
@@ -75,7 +84,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Non-blocking webhook delivery
-  void deliverWebhookEvent(supabase, user.id, {
+  void deliverWebhookEvent(supabase, ctx.ownerId, {
     event: "contact.created",
     timestamp: new Date().toISOString(),
     data: {
@@ -93,7 +102,7 @@ export async function POST(request: NextRequest) {
         const { data: profile } = await supabase
           .from("profiles")
           .select("slack_webhook_url, slack_notify_hot_leads")
-          .eq("user_id", user.id)
+          .eq("user_id", ctx.ownerId)
           .single();
         if (profile?.slack_webhook_url && profile.slack_notify_hot_leads) {
           await sendSlackNotification(profile.slack_webhook_url, {

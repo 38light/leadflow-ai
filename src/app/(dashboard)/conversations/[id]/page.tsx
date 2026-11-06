@@ -1,5 +1,5 @@
 import { createServerClient } from "@/lib/supabase/server";
-import { getUser } from "@/lib/auth/get-user";
+import { getAuthContext } from "@/lib/auth/get-user";
 import { notFound } from "next/navigation";
 import { ConversationThread } from "@/components/conversations/conversation-thread";
 import { ScoreConversationButton } from "@/components/conversations/score-conversation-button";
@@ -10,7 +10,7 @@ export default async function ConversationDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const user = await getUser();
+  const ctx = await getAuthContext();
   const supabase = await createServerClient();
   const { id } = await params;
 
@@ -18,7 +18,7 @@ export default async function ConversationDetailPage({
     .from("conversations")
     .select("*, contact:contacts(*)")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", ctx.ownerId)
     .single();
 
   if (!conversation) notFound();
@@ -27,8 +27,8 @@ export default async function ConversationDetailPage({
     .from("messages")
     .select("*")
     .eq("conversation_id", id)
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
+    .eq("user_id", ctx.ownerId)
+    .order("created_at", { ascending: false })
     .limit(100);
 
   const metadata = (conversation.metadata as Record<string, unknown> | null) ?? {};
@@ -44,13 +44,14 @@ export default async function ConversationDetailPage({
       </div>
       <ConversationThread
         conversationId={id}
-        initialMessages={messages ?? []}
+        initialMessages={(messages ?? []).reverse()}
         contact={{
           name: conversation.contact?.name ?? null,
           email: conversation.contact?.email ?? null,
         }}
         channel={conversation.channel_type}
         isAiEnabled={conversation.is_ai_active}
+        canReply={ctx.teamRole !== "viewer"}
       />
     </div>
   );
