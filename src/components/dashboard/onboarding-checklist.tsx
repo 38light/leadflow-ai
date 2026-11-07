@@ -1,168 +1,129 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { ArrowRight, CheckCircle2, Circle, Sparkles, X } from "lucide-react";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from "@/components/ui/card";
+import { ArrowRight, CheckCircle2, Circle, RefreshCw, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type {
-  OnboardingItem,
-  OnboardingResponse,
-} from "@/app/api/dashboard/onboarding/route";
+import type { OnboardingItem, OnboardingResponse } from "@/app/api/dashboard/onboarding/route";
 
-const DISMISS_STORAGE_KEY = "onboarding_checklist_dismissed";
+function dismissalKey(data: OnboardingResponse) {
+  return `leadflow:pilot-checklist:v1:${data.ownerId}:${data.currentUserId}`;
+}
 
 export function OnboardingChecklist() {
   const [data, setData] = useState<OnboardingResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [error, setError] = useState("");
+  const requestRef = useRef<AbortController | null>(null);
+  const dismissedKeyRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setDismissed(window.localStorage.getItem(DISMISS_STORAGE_KEY) === "1");
-    }
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
+  const load = useCallback(async () => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setRefreshing(true);
+    try {
+      const response = await fetch("/api/dashboard/onboarding", { cache: "no-store", signal: controller.signal });
+      const json = await response.json();
+      if (!response.ok || !json.data) throw new Error(json.error ?? "Could not load your pilot checklist. Please try again.");
+      if (controller.signal.aborted) return;
+      const next = json.data as OnboardingResponse;
+      const key = dismissalKey(next);
+      let isDismissed = dismissedKeyRef.current === key;
       try {
-        const res = await fetch("/api/dashboard/onboarding", { cache: "no-store" });
-        if (!res.ok) {
-          setLoading(false);
-          return;
-        }
-        const json = (await res.json()) as { data: OnboardingResponse };
-        if (!cancelled) {
-          setData(json.data);
-          setLoading(false);
-        }
+        isDismissed = isDismissed || window.localStorage.getItem(key) === "1";
       } catch {
-        if (!cancelled) setLoading(false);
+        // Storage may be unavailable; a dismissal still works for this visit.
+      }
+      setDismissed(isDismissed);
+      setData(next);
+      setError("");
+    } catch (err) {
+      if (!controller.signal.aborted) setError(err instanceof Error ? err.message : "Could not load your pilot checklist. Please try again.");
+    } finally {
+      if (!controller.signal.aborted) {
+        setLoading(false);
+        setRefreshing(false);
       }
     }
-    void load();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
-  function handleDismiss() {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(DISMISS_STORAGE_KEY, "1");
-    }
+  useEffect(() => {
+    void load();
+    const refreshVisible = () => { if (document.visibilityState === "visible") void load(); };
+    const interval = window.setInterval(refreshVisible, 60_000);
+    window.addEventListener("focus", refreshVisible);
+    document.addEventListener("visibilitychange", refreshVisible);
+    return () => {
+      requestRef.current?.abort();
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshVisible);
+      document.removeEventListener("visibilitychange", refreshVisible);
+    };
+  }, [load]);
+
+  function dismiss() {
+    if (!data) return;
+    const key = dismissalKey(data);
+    dismissedKeyRef.current = key;
+    try { window.localStorage.setItem(key, "1"); } catch { /* This visit still stays dismissed. */ }
     setDismissed(true);
   }
 
-  if (loading || !data) return null;
+  if (dismissed || data?.allDone) return null;
 
-  // If user is past onboarding (has contacts) OR they've dismissed, hide.
-  if (data.hasContacts || dismissed) return null;
+  if (loading) return (
+    <section className="rounded-xl border border-blue-100 bg-white px-5 py-4" aria-busy="true" aria-label="Loading pilot checklist">
+      <h2 className="font-semibold text-gray-950">Start your web chat pilot</h2>
+      <p role="status" className="mt-2 text-sm text-gray-500">Checking your first conversation and next step…</p>
+    </section>
+  );
 
-  const doneCount = data.items.filter((i) => i.done).length;
-  const total = data.items.length;
+  if (!data) return (
+    <section className="rounded-xl border border-blue-100 bg-white px-5 py-4" aria-label="Pilot checklist">
+      <h2 className="font-semibold text-gray-950">Start your web chat pilot</h2>
+      <p role="alert" className="mt-2 text-sm text-red-700">{error || "Could not load your pilot checklist."}</p>
+      <Button className="mt-3" variant="outline" size="sm" onClick={() => void load()} loading={refreshing}>Retry checklist</Button>
+    </section>
+  );
 
-  if (data.allDone) {
-    return (
-      <Card className="border-green-200 bg-gradient-to-br from-green-50 to-white">
-        <CardContent className="p-6 flex items-start gap-4">
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-green-100 shrink-0">
-            <Sparkles className="h-5 w-5 text-green-600" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-base font-semibold text-gray-900">
-              You&apos;re all set!
-            </h3>
-            <p className="mt-1 text-sm text-gray-600">
-              Your workspace is fully configured. Time to start converting leads.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleDismiss}
-            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            aria-label="Dismiss"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </CardContent>
-      </Card>
-    );
-  }
-
+  const doneCount = data.items.filter((item) => item.done).length;
   return (
-    <Card>
-      <CardHeader className="pb-3">
+    <section className="overflow-hidden rounded-xl border border-blue-100 bg-white" aria-labelledby="pilot-checklist-title">
+      <div className="border-b border-blue-100 bg-blue-50/40 px-5 py-4">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex-1">
-            <CardTitle>Get started</CardTitle>
-            <p className="mt-1 text-sm text-gray-500">
-              {doneCount} of {total} done
-            </p>
+          <div>
+            <h2 id="pilot-checklist-title" className="font-semibold text-gray-950">Start your web chat pilot</h2>
+            <p className="mt-1 text-sm text-gray-600">Follow one enquiry from the visitor’s chat to your next action.</p>
           </div>
-          <button
-            type="button"
-            onClick={handleDismiss}
-            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            aria-label="Dismiss"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <button type="button" onClick={dismiss} className="rounded p-1 text-gray-500 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label="Dismiss pilot checklist"><X className="h-4 w-4" /></button>
         </div>
-        <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-100">
-          <div
-            className="h-full rounded-full bg-blue-600 transition-all duration-500"
-            style={{ width: `${data.percent}%` }}
-          />
+        <div className="mt-4 flex items-center gap-3">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-blue-100" role="progressbar" aria-label="Pilot milestones completed" aria-valuemin={0} aria-valuemax={data.items.length} aria-valuenow={doneCount}>
+            <div className="h-full rounded-full bg-blue-600 transition-all motion-reduce:transition-none" style={{ width: `${data.percent}%` }} />
+          </div>
+          <span className="text-xs font-medium tabular-nums text-blue-900">{doneCount} of {data.items.length}</span>
+          <button type="button" onClick={() => void load()} disabled={refreshing} className="rounded p-1 text-blue-700 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50" aria-label="Refresh pilot checklist"><RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin motion-reduce:animate-none")} /></button>
         </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <ul className="divide-y divide-gray-100">
-          {data.items.map((item) => (
-            <ChecklistRow key={item.key} item={item} />
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
+      </div>
+      {error && <p role="alert" className="px-5 pt-3 text-sm text-red-700">{error} Showing your last loaded progress.</p>}
+      <ul className="grid divide-y divide-gray-100 px-5 lg:grid-cols-2 lg:gap-x-6">
+        {data.items.map((item) => <ChecklistRow key={item.key} item={item} />)}
+      </ul>
+    </section>
   );
 }
 
 function ChecklistRow({ item }: { item: OnboardingItem }) {
-  return (
-    <li>
-      <Link
-        href={item.href as Route}
-        className={cn(
-          "group flex items-start gap-3 py-3 px-1 -mx-1 rounded-md transition-colors hover:bg-gray-50",
-          item.done && "opacity-60"
-        )}
-      >
-        <span className="mt-0.5 shrink-0">
-          {item.done ? (
-            <CheckCircle2 className="h-5 w-5 text-green-600" />
-          ) : (
-            <Circle className="h-5 w-5 text-gray-300" />
-          )}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p
-            className={cn(
-              "text-sm font-medium text-gray-900",
-              item.done && "line-through text-gray-500"
-            )}
-          >
-            {item.label}
-          </p>
-          <p className="mt-0.5 text-xs text-gray-500">{item.description}</p>
-        </div>
-        <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-gray-300 transition-colors group-hover:text-gray-600" />
-      </Link>
-    </li>
-  );
+  return <li>
+    <Link href={item.href as Route} className="group flex items-start gap-3 rounded-md py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+      <span className="mt-0.5 shrink-0" aria-label={item.done ? "Completed" : "Not completed"}>{item.done ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <Circle className="h-5 w-5 text-blue-300" />}</span>
+      <div className="min-w-0 flex-1"><p className={cn("text-sm font-medium", item.done ? "text-gray-500" : "text-gray-900 group-hover:text-blue-700")}>{item.label}</p><p className="mt-1 text-xs leading-5 text-gray-500">{item.description}</p></div>
+      <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-gray-300 group-hover:text-blue-600" />
+    </Link>
+  </li>;
 }

@@ -9,7 +9,10 @@
     "lint": "eslint src --max-warnings 0",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "test:integration": "node scripts/verify-daily-workflow.mjs"
+    "test:integration": "node scripts/verify-daily-workflow.mjs",
+    "test:migrations": "bash scripts/verify-migrations.sh",
+    "test:hosted": "node scripts/verify-hosted-pilot.mjs",
+    "check:pilot": "node scripts/check-pilot.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

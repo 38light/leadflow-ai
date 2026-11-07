@@ -5,6 +5,12 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 
 type FollowUpRow = Omit<import("./today").FollowUp, "contact">;
 
+export interface RateLimitBucketRow {
+  key_hash: string;
+  hits: number;
+  expires_at: string;
+}
+
 interface WebChatSessionRow {
   id: string;
   user_id: string;
@@ -516,6 +522,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      consume_public_rate_limit: {
+        Args: { p_key_hash: string; p_limit: number; p_window_seconds: number };
+        Returns: { allowed: boolean; remaining: number; reset: number };
+      };
       receive_web_chat_message: {
         Args: { p_owner_id: string; p_token_hash: string; p_request_id: string; p_content: string; p_name?: string | null; p_email?: string | null };
         Returns: Json;
@@ -589,6 +599,20 @@ export type Database = {
         Returns: BookingSettingsRow[];
       };
     };
+    Enums: Record<string, never>;
+  };
+  // Service-only metadata; this schema is not exposed through the Data API.
+  private: {
+    Tables: {
+      rate_limit_buckets: {
+        Row: RateLimitBucketRow;
+        Insert: RateLimitBucketRow;
+        Update: Partial<RateLimitBucketRow>;
+        Relationships: [];
+      };
+    };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
     Enums: Record<string, never>;
   };
 };

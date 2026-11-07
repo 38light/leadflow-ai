@@ -8,7 +8,14 @@
 // vector(384) to match. If you ever change the model, update EMBEDDING_DIMENSIONS
 // AND the column/function dimension together (see supabase/migrations).
 
-import { pipeline, type FeatureExtractionPipeline } from "@huggingface/transformers";
+import { env, pipeline, type FeatureExtractionPipeline } from "@huggingface/transformers";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+if (process.env.VERCEL === "1") {
+  env.cacheDir = join(tmpdir(), "leadflow-transformers");
+  env.allowLocalModels = false;
+}
 
 const EMBEDDING_MODEL = "Xenova/bge-small-en-v1.5";
 export const EMBEDDING_DIMENSIONS = 384;
@@ -22,7 +29,10 @@ let extractorPromise: Promise<FeatureExtractionPipeline> | null = null;
 
 function getExtractor(): Promise<FeatureExtractionPipeline> {
   if (!extractorPromise) {
-    extractorPromise = pipeline("feature-extraction", EMBEDDING_MODEL);
+    extractorPromise = pipeline("feature-extraction", EMBEDDING_MODEL).catch((error: unknown) => {
+      extractorPromise = null;
+      throw error;
+    });
   }
   return extractorPromise;
 }

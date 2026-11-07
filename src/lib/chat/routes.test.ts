@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
-  getAPIContext: vi.fn(), db: { from: vi.fn(), rpc: vi.fn() }, getChatSession: vi.fn(), processInboundMessage: vi.fn(),
+  getAPIContext: vi.fn(), db: { from: vi.fn(), rpc: vi.fn() }, getChatSession: vi.fn(), processInboundMessage: vi.fn(), rateLimitBusinessAI: vi.fn(),
 }));
 vi.mock("@/lib/auth/get-user", () => ({ getAPIContext: mocks.getAPIContext }));
 vi.mock("@/lib/supabase/server", () => ({ createAdminClient: () => mocks.db, createServerClient: async () => mocks.db }));
 vi.mock("@/lib/ai/orchestrator", () => ({ processInboundMessage: mocks.processInboundMessage }));
-vi.mock("@/lib/rate-limit/chat", () => ({ rateLimitByIp: async () => ({ allowed: true }), rateLimitChatMessage: async () => ({ allowed: true }) }));
+vi.mock("@/lib/rate-limit/chat", () => ({ rateLimitByIp: async () => ({ allowed: true }), rateLimitChatMessage: async () => ({ allowed: true }), rateLimitBusinessAI: mocks.rateLimitBusinessAI }));
 vi.mock("@/lib/chat/session", async importOriginal => ({ ...await importOriginal<object>(), getChatSession: mocks.getChatSession }));
 
 import { POST as visitorMessage } from "@/app/api/chat/message/route";
@@ -36,6 +36,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.getAPIContext.mockResolvedValue({ ownerId, user: { id: ownerId }, teamRole: null });
   mocks.getChatSession.mockResolvedValue({ user_id: ownerId, conversation_id: conversationId });
+  mocks.rateLimitBusinessAI.mockResolvedValue({ allowed: true, remaining: 99, reset: 0 });
   mocks.db.rpc.mockResolvedValue({ data: { message_id: messageId, contact_id: "contact", conversation_id: conversationId, duplicate: false, is_first_message: true, is_ai_active: true }, error: null });
   mocks.db.from.mockImplementation(table => {
     if (table === "profiles") return query({ business_name: "Test", business_type: "general", ai_enabled: true });
@@ -78,6 +79,37 @@ describe("visitor delivery", () => {
     expect(res.status).toBe(202);
     expect(await res.text()).not.toContain("private provider");
     log.mockRestore();
+  });
+  it("acknowledges a durable enquiry and hands it to staff when the paid-AI budget is exhausted", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.rateLimitBusinessAI.mockResolvedValue({ allowed: false, remaining: 0, reset: 1800000060 });
+    const handoff = query();
+    const originalFrom = mocks.db.from.getMockImplementation()!;
+    mocks.db.from.mockImplementation(table => table === "conversations" ? handoff : originalFrom(table));
+    try {
+      const res = await visitorMessage(request(body));
+      expect(res.status).toBe(202);
+      expect(await res.json()).toEqual({ data: { messageId, clientMessageId: messageId, accepted: true, status: "awaiting_reply" } });
+      expect(mocks.db.rpc).toHaveBeenCalledWith("receive_web_chat_message", expect.objectContaining({ p_owner_id: ownerId, p_request_id: messageId, p_content: body.content }));
+      expect(mocks.rateLimitBusinessAI).toHaveBeenCalledWith(ownerId);
+      expect(mocks.processInboundMessage).not.toHaveBeenCalled();
+      expect(mocks.db.rpc).not.toHaveBeenCalledWith("publish_web_chat_ai_reply", expect.anything());
+      expect(handoff.update).toHaveBeenCalledWith(expect.objectContaining({ is_ai_active: false }));
+      expect(handoff.eq).toHaveBeenCalledWith("user_id", ownerId);
+      expect(handoff.eq).toHaveBeenCalledWith("id", conversationId);
+    } finally {
+      log.mockRestore();
+    }
+  });
+  it("processes opt-out without consuming the paid-AI quota", async () => {
+    mocks.rateLimitBusinessAI.mockResolvedValue({ allowed: false, remaining: 0, reset: 1800000060 });
+    mocks.processInboundMessage.mockResolvedValue({ shouldSend: false, responseContent: "Opt-out acknowledged", isOptOut: true });
+    const res = await visitorMessage(request({ ...body, content: "STOP" }));
+    expect(res.status).toBe(200);
+    expect(mocks.db.rpc).toHaveBeenCalledWith("receive_web_chat_message", expect.objectContaining({ p_content: "STOP" }));
+    expect(mocks.rateLimitBusinessAI).not.toHaveBeenCalled();
+    expect(mocks.processInboundMessage).toHaveBeenCalledWith(expect.objectContaining({ inboundContent: "STOP", userId: ownerId }));
+    expect(await res.json()).toMatchObject({ data: { accepted: true, messageId } });
   });
   it("rejects malformed request IDs before any DB write", async () => {
     expect((await visitorMessage(request({ ...body, clientMessageId: "bad" }))).status).toBe(400);

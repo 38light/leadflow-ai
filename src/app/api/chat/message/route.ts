@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/server";
 import { processInboundMessage } from "@/lib/ai/orchestrator";
-import { rateLimitChatMessage, rateLimitByIp } from "@/lib/rate-limit/chat";
+import { rateLimitChatMessage, rateLimitByIp, rateLimitBusinessAI } from "@/lib/rate-limit/chat";
 import { getChatSession, hashSessionToken, publicReply, sessionCredentialsSchema } from "@/lib/chat/session";
 import { isOptOutMessage } from "@/lib/ai/prompts/response-rules";
 
@@ -42,6 +42,9 @@ export async function POST(request: NextRequest) {
     }
     // The message is durable. AI failures leave it available for a human.
     try {
+      if (!isOptOut && !(await rateLimitBusinessAI(businessId)).allowed) {
+        throw new Error("Business AI quota unavailable or exhausted");
+      }
       const { data: contact, error: contactError } = await supabase.from("contacts")
         .select("opted_out").eq("id", accepted.contact_id).eq("user_id", businessId).single();
       if (contactError) throw contactError;

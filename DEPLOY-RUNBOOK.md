@@ -1,84 +1,64 @@
-# Production Provisioning Runbook
+# LeadFlow private pilot
 
-> Status: **NOT provisioned** (deliberate — local-only dev). This is the exact,
-> de-risked sequence to stand up the cloud backend + deploy when you decide to.
-> Estimated cost: **~$10/mo** for a Supabase project (org *Nazmul's Insights*,
-> `zpewvydbvijarxpjlwuu`). Vercel hosting can be free tier.
->
-> The migration chain has been **dry-run end-to-end against a fresh database**
-> (all migrations apply clean, in order, zero errors — last verified 2026-06-28
-> at 24; one added 2026-06-29 → 25 total), so step 3 is the only DB step and it
-> is known-good.
+## Environments
 
-## 1. Create the Supabase project
-- Supabase dashboard → org *Nazmul's Insights* → New project.
-- Pick a strong DB password (save it). Region: closest to users (e.g. Sydney).
-- After it provisions, collect from Project Settings → API:
-  - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
-  - `anon` public key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-  - `service_role` secret key → `SUPABASE_SERVICE_ROLE_KEY`
-  - Project ref (the `xxxx` in the URL) → used in step 2.
+- Production app: https://leadflow-ai-green-alpha.vercel.app (Vercel project `38light/leadflow-ai`).
+- Pilot backend: `exghomavadwqhxtunzds`, **LeadFlow Pilot**, Sydney, PostgreSQL 17.11.0.018, in the existing free Supabase organisation `aianssjonfowvawphuel`.
+- Pilot owner: `talk@nazmc.com`. Create through an admin invitation, with AI disabled and approval required initially. Never seed demo contacts or a demo super-admin into this database.
+- Archived backend: `cujeuerrfermubhonfyf`. Restored for inspection, then returned to its paused state; demo data was retained.
+- Local dev stays on port 3004 with its own local database. Its schema has no migration ledger: apply only newly added migrations explicitly, never replay the chain there.
 
-## 2. Link the CLI
-```bash
-supabase link --project-ref <PROJECT_REF>
-# paste the DB password when prompted
-```
+## Release checks
 
-## 3. Push migrations (known-good — verified clean)
-```bash
-supabase db push
-```
-This applies all 25 files in `supabase/migrations/` in order. The previous
-version-collision blocker is fixed (unique 14-digit versions); a full-chain
-dry-run on a fresh DB passed (24 verified 2026-06-28; `20260629000001` added
-after, append-only).
+1. Stop local Next.js servers before building because they share `.next`.
+2. Run `npm test`, `npm run lint`, `npm run build`, `npm run type-check`, and `npm run test:migrations`.
+3. For authenticated local end-to-end QA, start `SKIP_AUTH=false NEXT_PUBLIC_PILOT_MODE=true ./node_modules/.bin/next start --hostname 127.0.0.1 --port 3005`, then run `npm run test:integration`. All fixtures are disposable and no AI or external message providers are called.
+4. Review the diff, update `AGENTS.md`, commit, and push. GitHub Actions checks tests, lint, build, and types on pushes and PRs.
+5. Confirm the linked Supabase project before `supabase db push --dry-run`, review pending migrations, then apply them with `supabase db push`. Never reset production or repoint the destructive demo seed scripts at it.
+6. Deploy with `vercel --prod`. The Vercel build runs `npm run check:pilot` before `npm run build`.
+7. Run `npm run test:hosted` with the four app/Supabase environment values below and `PILOT_QA_PROJECT_REF=exghomavadwqhxtunzds`; add `PILOT_QA_REALTIME=true` to include subscription delivery. It verifies anonymous denial, owner login, tenant isolation, visitor enquiry, reply delivery, follow-up completion, onboarding, and private storage. It creates isolated QA accounts without email and deletes only its own fixtures. It deliberately does not load `.env.local`.
 
-## 4. (Optional) seed demo data
-Real signups auto-create a `profiles` row via the `handle_new_user` trigger, so
-seeding is only for a demo. The local seed scripts (`scripts/seed.ts`,
-`scripts/seed-demo-extras.ts`) point at env vars — repoint them at the prod
-URL + service-role key first, and only run against an empty prod DB.
+## Hosting and environment
 
-## 5. Set environment variables (Vercel → Project → Settings → Environment Variables)
-**Required (app will not work without these):**
+Vercel uses Next.js, Node 24, and `syd1`. `vercel.json` sets the same region for all functions and a 60-second API duration. Production's stable domain serves the public visitor widget; workspace pages/API routes require app authentication. Preview and generated deployment URLs retain Vercel protection.
+
+Required production and preview environment variables:
+
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `ANTHROPIC_API_KEY` (AI features; users can also set their own in Settings)
-- `NEXT_PUBLIC_APP_URL` / `NEXT_PUBLIC_SITE_URL` (your prod domain)
+- `SUPABASE_SERVICE_ROLE_KEY` (sensitive server secret)
+- `NEXT_PUBLIC_APP_URL=https://leadflow-ai-green-alpha.vercel.app`
+- `NEXT_PUBLIC_PILOT_MODE=true`
+- `ONNXRUNTIME_NODE_INSTALL=skip` (must exist before dependency installation; keeps the ONNX CPU runtime and avoids CUDA downloads)
+- `CHAT_AI_DAILY_LIMIT=100`
 
-**Do NOT set `SKIP_AUTH`.** It is a local-dev backdoor; `skipAuthEnabled()`
-throws if it is ever present on a Vercel deploy. Leave it unset.
+Leave `SKIP_AUTH` and `ALLOW_UNVERIFIED_WEBHOOKS` unset. `.vercelignore` excludes all environment files, backups, local Vercel state, and seed scripts. Secrets are managed in Vercel; ignored local `.vercel` files are for provisioning/QA only and must never be committed or shared.
 
-**Strongly recommended for a public deploy:**
-- `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` — **without these the
-  rate limits degrade to allow-all**, so the booking/contact/newsletter/chat
-  abuse protections (M8, H2, etc.) won't actually limit anything. Set them to
-  make those security controls real.
+Production public-endpoint rate limits use the service-only `consume_public_rate_limit` RPC, backed by hashed counters in the private schema. RLS and privilege revocation prevent client access. Optional Upstash variables switch to Redis; configure both values together. Failure denies requests. AI quota exhaustion preserves the enquiry for human handling.
 
-**Optional (per integration you enable):**
-- Payments: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
-- Email: `RESEND_API_KEY`, `CONTACT_EMAIL`
-- Telephony/WhatsApp: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `TWILIO_WHATSAPP_NUMBER`
-- Meta: `META_APP_SECRET`, `META_VERIFY_TOKEN`
-- HubSpot: `HUBSPOT_CLIENT_SECRET`
-- Voice: `VAPI_WEBHOOK_SECRET`
-- Embeddings: `VOYAGE_API_KEY`
-- Webhook egress allowlist (optional SSRF tightening): `WEBHOOK_EGRESS_ALLOWLIST`
-- `ALLOW_UNVERIFIED_WEBHOOKS` — leave UNSET in prod (only for local webhook testing; it disables Meta/Twilio signature enforcement).
+`ANTHROPIC_API_KEY` is optional for human-operated pilot chat. The existing local key failed provider authentication on 2026-11-07 and was not copied to production. Supply a valid key and verify a synthetic enquiry before enabling AI. Other provider/payment/calendar integrations are not enabled by this pilot setup.
 
-## 6. Deploy
-- Push to the branch Vercel tracks (or `vercel --prod`). Build is verified clean.
+## Invitation and recovery
 
-## 7. Post-deploy smoke check
-- Register a new user → confirm a `profiles` row appears and you land in the dashboard.
-- Open a booking page `/<slug>` → confirm services/availability render (RPC path).
-- Trigger one AI chat message → confirm a reply + an `ai_interaction_logs` row.
-- Confirm `SKIP_AUTH` is unset (the app would crash on boot if it were set).
+Hosted Supabase Auth must have public signup **disabled** and email confirmation enabled. The public pilot flag changes UI only; it does not enforce membership.
 
-## Security posture note
-All hardening migrations (`20260628000001/02/03`) are in the chain, so RLS,
-the role-escalation guard, booking-settings RPC, notifications lockdown, and the
-billing-counter lockdown all ship automatically. The only security control that
-needs an env var to be *active* is the rate limiting (needs Upstash — step 5).
+Site URL: `https://leadflow-ai-green-alpha.vercel.app`.
+
+Allow only these same-origin redirect destinations:
+
+- `/reset-password`
+- `/api/auth/callback`
+- `/api/auth/callback?next=%2Fdashboard`
+- `/api/auth/callback?next=%2Freset-password`
+
+Default Supabase invitation links should redirect to `/reset-password`. The client validates the invite/recovery fragment, removes credentials from the URL, verifies the session identity, and asks the user to choose their password. PKCE confirmation/recovery callbacks are exchanged on the server. Tokens must never appear in logs, screenshots, commits, or release notes.
+
+Free Supabase with its default email provider does not allow custom email templates. The default provider permits messages to organisation-member addresses; the pilot owner is a member. Configure custom SMTP before inviting other businesses or relying on broader password-recovery delivery. Generating an invitation link does not send email; do not send invitations without user authorization.
+
+## Database and rollback
+
+All 29 migrations were applied to the initially empty pilot database. The chain includes RLS hardening, follow-ups, web-chat capabilities, private knowledge storage, realtime publication, and durable rate limits. Migration verification uses a disposable local database and removes it afterward.
+
+The installed local PostgreSQL image 17.6.1.104 has an upstream Supautils crash on denied function EXECUTE. The verifier checks those grants through privilege catalogs instead of exercising that engine bug; service-role behavior and concurrent limits are exercised normally. The pilot uses a newer engine. Do not upgrade or reset unrelated local containers as part of an app release.
+
+Rollback the app to the previous verified Vercel deployment if sign-in, tenant isolation, message delivery, or follow-up writes fail. Retain the additive database migrations and customer data. Disable AI first if only provider calls fail. Do not drop tables or restore a database backup without a specific recovery plan and user authorization.

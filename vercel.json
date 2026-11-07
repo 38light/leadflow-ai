@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run check:pilot && npm run build",
+  "regions": ["syd1"],
+  "functions": {
+    "src/app/api/**/*.ts": { "maxDuration": 60 }
+  }
+}

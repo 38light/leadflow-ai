@@ -1,0 +1,9 @@
+.env*
+*.bak
+.git
+.next
+.vercel
+node_modules
+supabase/.temp
+supabase/.branches
+scripts/seed*

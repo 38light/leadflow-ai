@@ -2,6 +2,14 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { skipAuthEnabled } from "@/lib/security/skip-auth";
 
+function redirectWithSessionCookies(url: URL, sessionResponse: NextResponse) {
+  const response = NextResponse.redirect(url);
+  // Supabase may rotate or clear auth cookies during getUser(). Carry those
+  // changes onto redirects as well, including their security attributes.
+  for (const cookie of sessionResponse.cookies.getAll()) response.cookies.set(cookie);
+  return response;
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -65,7 +73,7 @@ export async function updateSession(request: NextRequest) {
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    return redirectWithSessionCookies(url, supabaseResponse);
   }
 
   // Redirect authenticated users away from auth pages
@@ -76,7 +84,7 @@ export async function updateSession(request: NextRequest) {
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+    return redirectWithSessionCookies(url, supabaseResponse);
   }
 
   return supabaseResponse;

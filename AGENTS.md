@@ -8,10 +8,16 @@
 - Scope business data by `getAPIContext().ownerId`; viewers cannot perform mutations. Shared navigation receives the server-authenticated admin flag.
 - Today lives at `/dashboard`; follow-ups live on contact records and in Today. Due timestamps are stored in UTC; Today uses the business timezone and contact forms identify the device timezone.
 - Web-chat sessions use hashed 32-byte capabilities, have a 30-day expiry, and expose only their own persisted messages. The public polling endpoint accepts the token in a POST body.
+- Private pilot: Vercel `38light/leadflow-ai`, Node 24, all functions in `syd1`; stable URL `https://leadflow-ai-green-alpha.vercel.app`. Clean Supabase `exghomavadwqhxtunzds` is in Sydney with all 29 migrations applied. Local data remains separate.
+- Hosted signup is disabled in Supabase Auth; `NEXT_PUBLIC_PILOT_MODE=true` shows invitation-only screens. Never deploy `SKIP_AUTH=true` or unverified webhook bypasses. `npm run check:pilot` guards the Vercel build.
+- Production rate limits default to the service-only database RPC; optional Redis requires both credentials. AI enquiry cap defaults to 100 per business per 24 hours. Set `ONNXRUNTIME_NODE_INSTALL=skip` before hosted dependency installation; embeddings cache under the server's temporary directory.
+- `npm run test:migrations` validates all migrations and ownership/concurrency in a disposable local database. `npm run test:hosted` requires explicit cloud credentials and a matching `PILOT_QA_PROJECT_REF`; it creates and removes only synthetic fixtures. Optional `PILOT_QA_REALTIME=true` checks a real subscription receipt.
 
 ## What's Been Done
 - [2026-11-07] Built the first daily-workflow release: Today action queues, assigned follow-ups with due dates and conflict protection, contact next-step summaries, transactional web-chat approvals and manual replies, persistent visitor transcripts, tenant/team access checks, and modal hydration repair. Added two local database migrations and automated verification.
 - [2026-11-07] Release QA passed: production build (187 app route entries), TypeScript, zero-warning lint, 105 unit tests, 53 authenticated integration checks, and mobile/desktop browser checks for add/reschedule/snooze/complete. Removed disposable QA records and kept the local app on port 3004.
+- [2026-11-07] Prepared the private pilot with real sign-in/invitation/password recovery, identity-bound password updates, activity-based onboarding, private storage policies, realtime publication, durable rate limits, deployment preflight and CI; provisioned a clean cloud database and retained the archived demo backend.
+- [2026-11-07] Pilot release QA: 181 unit tests, zero-warning lint, production build, TypeScript, 53 authenticated local integration checks, and all 29 migrations including storage ownership and concurrent rate-limit checks passed.
 
 ## Known Quirks
 - The local database was provisioned outside the Supabase migration ledger; `supabase_migrations.schema_migrations` is absent. New migrations were applied explicitly through transactional `psql`; do not replay the full migration chain against this database.
@@ -21,9 +27,13 @@
 - The local `SKIP_AUTH=true` setup uses a service-role client. Authenticated integration checks must run with `SKIP_AUTH=false` and exercise real owner/member/viewer sessions.
 - Local Auth accepts ES256 user tokens but rejects older HS256 admin JWTs. The integration harness reads current local keys through `supabase status`, creates disposable users directly in the local database, and uses the real password sign-in flow.
 - In the Codex browser, automated `fill()` on `datetime-local` can update the visible value without firing React's change handler. Use the native date picker or keyboard date segments and verify the persisted date.
+- The old local PostgreSQL image 17.6.1.104 can crash on denied function EXECUTE (upstream Supautils issue); migration QA checks denied privileges through catalogs. The new cloud pilot uses 17.11.0.018. Do not reset or upgrade unrelated containers.
+- Default Supabase email templates use implicit invitation/recovery fragments; the reset page validates and clears them before SDK initialization. Custom SMTP is needed before inviting non-organisation members with the default free email service.
+- The saved local Anthropic key failed authentication and was not deployed; pilot AI must remain disabled until a valid key and a synthetic end-to-end AI enquiry are verified.
 
 ## Pending Tasks
 - Connect and verify external channel ingestion/delivery, with provider receipts and durable retries.
 - Connect AI appointment/payment actions to real booking/payment operations before enabling autonomous completion.
 - Add opt-in daily briefs and follow-up automation with stop conditions after validating the Today workflow with real businesses.
-- Provision production backend/hosting and production rate limiting when a production launch is requested.
+- Complete the pilot owner's password setup and business profile, then install the widget on the selected business website (not yet supplied).
+- Add a valid Anthropic key and verify AI responses before enabling AI; configure custom SMTP before inviting other businesses.

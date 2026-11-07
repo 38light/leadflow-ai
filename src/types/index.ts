@@ -425,3 +425,4 @@ export interface PipelineStage {
 // Daily work and follow-up contracts
 export type { FollowUp, FollowUpStatus, FollowUpAssignee, FollowUpsResponse, TodayData, TodayApproval, TodayBooking, TodayReply } from "./today";
 export type WebChatSession = import("./supabase").Database["public"]["Tables"]["web_chat_sessions"]["Row"];
+export type { RateLimitBucketRow } from "./supabase";
