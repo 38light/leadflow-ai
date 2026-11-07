@@ -20,7 +20,7 @@
 
 ## Hosting and environment
 
-Vercel uses Next.js, Node 24, and `syd1`. `vercel.json` sets the same region for all functions and a 60-second API duration. Production's stable domain serves the public visitor widget; workspace pages/API routes require app authentication. Preview and generated deployment URLs retain Vercel protection.
+Vercel uses Next.js, Node 24, and `syd1`. `vercel.json` sets the same region for all functions and a 60-second API duration. Installation uses `npm ci`; install/build commands remove only Vercel's unsupported `npm_config_cache_dir` variable, preserving normal cache configuration and all real npm warnings. Production's stable domain serves the public visitor widget; workspace pages/API routes require app authentication. Preview and generated deployment URLs retain Vercel protection.
 
 Required production and preview environment variables:
 

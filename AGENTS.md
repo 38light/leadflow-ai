@@ -18,6 +18,7 @@
 - [2026-11-07] Release QA passed: production build (187 app route entries), TypeScript, zero-warning lint, 105 unit tests, 53 authenticated integration checks, and mobile/desktop browser checks for add/reschedule/snooze/complete. Removed disposable QA records and kept the local app on port 3004.
 - [2026-11-07] Prepared the private pilot with real sign-in/invitation/password recovery, identity-bound password updates, activity-based onboarding, private storage policies, realtime publication, durable rate limits, deployment preflight and CI; provisioned a clean cloud database and retained the archived demo backend.
 - [2026-11-07] Pilot release QA: 181 unit tests, zero-warning lint, production build, TypeScript, 53 authenticated local integration checks, and all 29 migrations including storage ownership and concurrent rate-limit checks passed.
+- [2026-11-07] Published the private pilot and verified 30 hosted checks, including tenant isolation, visitor delivery, follow-ups, onboarding, private file access, and realtime receipt; removed synthetic fixtures. GitHub CI passed. Accepted the invitation for `talk@nazmc.com` and opened verified password setup in Codex; user must choose the password. Archived demo backend is paused.
 
 ## Known Quirks
 - The local database was provisioned outside the Supabase migration ledger; `supabase_migrations.schema_migrations` is absent. New migrations were applied explicitly through transactional `psql`; do not replay the full migration chain against this database.
@@ -30,6 +31,7 @@
 - The old local PostgreSQL image 17.6.1.104 can crash on denied function EXECUTE (upstream Supautils issue); migration QA checks denied privileges through catalogs. The new cloud pilot uses 17.11.0.018. Do not reset or upgrade unrelated containers.
 - Default Supabase email templates use implicit invitation/recovery fragments; the reset page validates and clears them before SDK initialization. Custom SMTP is needed before inviting non-organisation members with the default free email service.
 - The saved local Anthropic key failed authentication and was not deployed; pilot AI must remain disabled until a valid key and a synthetic end-to-end AI enquiry are verified.
+- Hosted login uses a client-rendered Suspense shell: HTTP smoke tests verify the shell and Auth settings, while browser QA verifies the invitation copy. Realtime QA gives subscription and receipt separate bounded waits.
 
 ## Pending Tasks
 - Connect and verify external channel ingestion/delivery, with provider receipts and durable retries.
