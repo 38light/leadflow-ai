@@ -5,6 +5,10 @@
 > conventions, integrations, and known risks. Do NOT re-scan the whole codebase; that file IS
 > the context dump. Only re-sweep the source if explicitly asked to "regenerate PROJECT-CONTEXT.md"
 > or if the file is clearly stale vs. the code.
+>
+> **Codex also works in this repo** and keeps its own log in [`AGENTS.md`](AGENTS.md). For anything after 2026-06-29
+> (the 2026-11-07 daily-workflow and private-pilot releases) `AGENTS.md` and the source are current; `PROJECT-CONTEXT.md`
+> and most of `APP.md` describe earlier states.
 
 ## Project Overview
 A SaaS platform for managing and converting leads into customers. Built with Next.js App Router, Supabase, TypeScript, and Tailwind CSS.
@@ -17,7 +21,7 @@ A SaaS platform for managing and converting leads into customers. Built with Nex
 - **State Management**: React Server Components + Zustand (client state)
 - **Payments**: Stripe
 - **Email**: Resend
-- **Deployment**: Vercel
+- **Deployment**: Vercel. Private pilot `38light/leadflow-ai` (Node 24, all functions in `syd1`) on Supabase `exghomavadwqhxtunzds` (Sydney, all 29 migrations), live since 2026-11-07. Local dev keeps its own Supabase stack on OrbStack (API 54421, DB 54422, Studio 54423).
 
 ## Project Structure
 ```
@@ -50,10 +54,15 @@ public/            # Static assets
 ```
 
 ## Commands
-- `npm run dev` - Start development server
-- `npm run build` - Production build
-- `npm run lint` - Run ESLint
+- `npm run dev` - Start development server (port 3004)
+- `npm run build` - Production build (stop the dev server first; both use `.next`)
+- `npm run lint` - Run ESLint (zero warnings allowed)
 - `npm run type-check` - Run TypeScript compiler check
+- `npm test` - Vitest unit tests
+- `npm run test:integration` - Authenticated local integration checks (needs `SKIP_AUTH=false` `next start` on port 3005; see `AGENTS.md`)
+- `npm run test:migrations` - Every migration plus ownership and concurrency checks in a disposable local database
+- `npm run test:hosted` - Hosted pilot checks (needs explicit cloud credentials and a matching `PILOT_QA_PROJECT_REF`)
+- `npm run check:pilot` - Pilot deploy preflight (also runs in the Vercel build)
 - `npx supabase db push` - Push migrations to Supabase
 - `npx supabase gen types typescript --local > src/types/supabase.ts` - Generate DB types
 
@@ -71,8 +80,8 @@ public/            # Static assets
 - One component per file, file named same as component
 
 ### API Routes
-- Always authenticate with `getUser()` before any DB operation
-- Always filter DB queries by `user_id` (prevent IDOR)
+- Authenticate with `getAPIContext()` and scope business data by `ctx.ownerId` (prevents IDOR; team members act on the owner's data)
+- Viewers are read-only: refuse their mutations (e.g. `canEditFollowUps(ctx)`)
 - Validate all inputs with Zod schemas from `lib/validators/`
 - Return consistent JSON: `{ data }` on success, `{ error }` on failure
 
@@ -134,3 +143,5 @@ public/            # Static assets
 - [2026-06-28] **Test coverage expanded 11 → 54 vitest** (tsc + lint + build clean). Added 6 hermetic (no DB/network) unit-test files for the highest-value pure/security-critical logic: `security/skip-auth.test.ts` (8 — the fail-closed SKIP_AUTH guard: unset/non-true → false, localhost forms → true, Vercel/non-localhost URL → throws), `scoring/lead-score.test.ts` (7 — won=100/lost=0 fixed, defaults, cap@100, unknown-enum fallback), `rate-limit/chat.test.ts` (5 — `getClientIp` x-forwarded-for/x-real-ip/unknown + Upstash-absent allow-all degrade), `utils/errors.test.ts` (5 — AppError defaults + `getErrorMessage`), `validators/contacts.test.ts` (9) + `validators/booking.test.ts` (9 — the public booking input boundary: bad email/date/time/uuid rejected, slug charset, defaults). API-route integration tests deferred (need a test-DB harness; lower ROI for local-only). `npm test` = 54/54.
 - [2026-06-28] **Security pass 3 — M5 + L8 closed** (build + tsc + 11 vitest + lint clean; migration applied + verified on local DB). **M5:** new `20260628000003_booking_settings_rpc.sql` drops the over-broad `Public can view booking settings by slug` policy (it let anon dump every tenant's full `booking_settings` row via raw PostgREST) and adds `get_public_booking_settings(slug)` (SECURITY DEFINER, slug-keyed, STABLE, `search_path=public`, `REVOKE … FROM PUBLIC` + GRANT anon/authenticated/service_role, returns `SETOF booking_settings`). The 3 public booking routes (`booking/[slug]/route.ts` + `/slots` + `/book`) now call the RPC (`supabase.rpc("get_public_booking_settings", { p_slug: slug })`, take `[0]`) instead of `select("*")` — booking pages unchanged, enumeration closed. Added the fn to hand-maintained `src/types/supabase.ts` Functions block (`Returns: BookingSettingsRow[]`). Verified as anon: known slug → 1 row, bogus slug → 0, direct table SELECT → 0. **L8:** genericized all **68 status-500** raw-`error.message` forwards across 40 API route files to `"Internal server error"` + added `console.error("[API]", error)` server-side logging (via a precise line-matched script handling both bare `return …` and `if (error) return …` forms). Deliberately scoped to 500 paths; intentional 4xx Zod/validation messages left intact. **Still open (product decision only):** `web_chat_enabled` widget flag (H2-full + L5) — needs a settings-UI on/off toggle; the dangerous AI-cost-abuse half is already closed by the per-IP rate limit. Committed + pushed.
 - [2026-06-29] **Knowledge-base RAG made functional + switched to free/offline local embeddings** (tsc + lint + build + 59 vitest all clean; migration applied + verified on local DB; live model smoke-tested). Discovered the whole RAG pipeline was **defined but unwired**: `generateEmbedding`/`match_knowledge_chunks`/`knowledge_chunks` had **zero callers**, uploaded files were stored but their **text never extracted**, and the orchestrator's `knowledge` route passed `[]` chunks ("populated when embeddings are ready"). Also a latent bug: code used Voyage `voyage-3` (1024-dim) while the DB column + RPC were `vector(1536)` (OpenAI size) — real embeddings would never have inserted. **Why Voyage at all:** Anthropic makes no embedding model and recommends Voyage; it's paid + online. **Replaced with Transformers.js** (`@huggingface/transformers`, model `Xenova/bge-small-en-v1.5`, **384-dim**) running **locally in-process — no API key, no cost, offline after a one-time ~90MB model download** (cached). `src/lib/ai/embeddings.ts` rewritten as a lazy singleton pipeline: `generateEmbedding` (doc), `generateQueryEmbedding` (prepends the bge "Represent this sentence…" instruction for recall), `generateEmbeddings` (batch). New `src/lib/ai/ingest.ts` = `extractText` (PDF via **pdf-parse v2** `new PDFParse({data}).getText()` — NOT the old `pdf-parse/lib` self-test workaround; DOCX via **mammoth**; txt/md/csv as UTF-8) + `chunkText` (~1000-char chunks, 150 overlap, paragraph→sentence boundaries) + `ingestDocument` (status `processing`→chunk→batch-embed→insert `knowledge_chunks` w/ `embedding: JSON.stringify(vec)`→status `ready`+`chunk_count`; idempotent: deletes prior chunks first). New `src/lib/ai/retrieve.ts` = `retrieveRelevantChunks` (embeds query, calls the service-role RPC, threshold 0.3 / 5 results). **Wiring:** documents POST route (`knowledge-bases/[id]/documents`) now runs ingest synchronously after upload (records `status:error`+`error_message` on failure instead of failing the upload); orchestrator `knowledge` case now retrieves real chunks via `inboundContent`. **Migration `20260629000001_local_embeddings_384.sql`:** drops the ivfflat index, `ALTER COLUMN embedding TYPE vector(384)`, recreates the index; redefines `match_knowledge_chunks` at 384; **adds `match_knowledge_chunks_for_user(query_embedding, p_user_id, …)`** — needed because the existing RPC hard-requires `auth.uid()`, but the orchestrator processes inbound webhook messages with the **service-role client (auth.uid() NULL)**, so it would always throw. New fn is SECURITY DEFINER, trusts an explicit `p_user_id` (service_role path), and guards authenticated callers to their own id; granted to authenticated+service_role, REVOKE FROM public (no anon RAG). `next.config.ts`: added `serverExternalPackages` for `@huggingface/transformers`/`onnxruntime-node`/`sharp`/`pdf-parse`/`mammoth` (keep native/large deps out of the webpack bundle). `src/types/supabase.ts`: added the new fn. New deps: `@huggingface/transformers`, `pdf-parse`@2, `mammoth` (pdf-parse pulls old transitive deps → 14 npm-audit warnings, accepted for local). New hermetic test `src/lib/ai/ingest.test.ts` (5, chunkText) → suite 54→59. **Live-verified the real model:** 384-dim out, and a "money back?" query ranked the refund doc 0.644 (top) vs unrelated 0.30–0.42. Note: `VOYAGE_API_KEY` no longer used anywhere. Migrations now 25 (was 24); new file is append-only + safe for a fresh `db push`. Behavior: upload a `.pdf/.docx/.txt/.md/.csv` to a knowledge base → it's chunked+embedded locally → the AI answers from it when a conversation routes to `knowledge`.
+- [2026-11-07] **Daily-workflow release + private pilot** (built by Codex in `e9f807d`, `955d680`, `65562ea`; full notes in `AGENTS.md`). **Today** at `/dashboard` (`GET /api/dashboard/today`, `src/lib/dashboard/today.ts`; queues capped at 200, business time zone). **Follow-ups** on contacts and in Today: `follow_ups` table, `GET/POST /api/follow-ups`, `PATCH /api/follow-ups/[id]` (409 when the row changed meanwhile; viewers read-only; due times stored in UTC). **Web chat** rebuilt: `POST /api/chat/init` issues a 32-byte session token stored only as a hash in `web_chat_sessions` (30-day expiry); `POST /api/chat/message` saves visitor messages idempotently; new polling endpoint `POST /api/chat/messages` returns only the session's own messages (token in the body); AI-approval and manual replies are transactional. **Private pilot**: invitation-only sign-in (`NEXT_PUBLIC_PILOT_MODE=true`, hosted signup off), password recovery (`/reset-password`), durable rate limits in the database (`private.rate_limit_buckets`, `consume_public_rate_limit()`; fail closed when deployed), private knowledge-file storage, realtime publication, GitHub CI and the `check:pilot` / `test:*` scripts. Migrations `20261107000001`–`000004` (29 in total). Live at `https://leadflow-ai-green-alpha.vercel.app`. Pilot AI stays off until a valid Anthropic key passes a synthetic end-to-end enquiry; custom SMTP is needed before inviting other businesses.
+- [2026-11-12] Synced `CLAUDE.md` and `APP.md` with the 2026-11-07 release (from `AGENTS.md` and the source). Docs only, no code changed.

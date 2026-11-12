@@ -1,7 +1,8 @@
 # Lead to Customer — Complete Application Documentation
 
 > Auto-update: This file should be regenerated whenever structural changes are made.
-> Last updated: 2026-04-18
+> Last full review: 2026-04-18. Partly updated 2026-11-12 for the 2026-11-07 release: Chat Widget, Follow-ups & Today, Migration Files.
+> Other sections may still describe the April state; [`AGENTS.md`](AGENTS.md) and the source are current.
 
 ---
 
@@ -177,6 +178,12 @@ Full audit trail of every AI decision.
 | `20260417_webhook_endpoints.sql` | webhook_endpoints with auto-disable at 5 failures |
 | `20260418_anthropic_key.sql` | profiles.anthropic_api_key column |
 | `20260418_audit_logs.sql` | audit_logs, feature_flags, admin_notes, account_tags |
+| `20261107000001_follow_ups.sql` | follow_ups + RLS (owner and team read; owner and editors write) |
+| `20261107000002_web_chat_delivery.sql` | web_chat_sessions (hashed tokens, expiry) for chat delivery; team read access to the ai_approvals queue |
+| `20261107000003_pilot_storage_realtime.sql` | Private knowledge-file storage bucket with owner policies; realtime publication |
+| `20261107000004_public_rate_limits.sql` | private.rate_limit_buckets + consume_public_rate_limit() for durable public rate limits |
+
+The dated April names above were renamed to unique 14-digit versions (`YYYYMMDD0000NN_*`) on 2026-06-28; `ls supabase/migrations` is authoritative (29 files as of 2026-11-07).
 
 ---
 
@@ -203,9 +210,12 @@ Full audit trail of every AI decision.
 ### Chat Widget (Public)
 | Method | Route | Auth | Description |
 |--------|-------|------|-------------|
-| POST | `/api/chat/init` | None (rate: 10/IP/min) | Create session, return sessionId |
-| POST | `/api/chat/message` | None (rate: 30/session/min) | Message → AI orchestrator → response |
-| GET | `/api/widget/[businessId]` | None | Widget config (colors, greeting) |
+| POST | `/api/chat/init` | None (10/IP/min) | Start a web-chat session: a random 32-byte token is returned once and stored only as a hash in `web_chat_sessions` (30-day expiry) |
+| POST | `/api/chat/message` | Session token (60/IP/min, 30/session/min, per-business AI cap, default 100/24h) | Save the visitor message idempotently (client message id), then reply through the AI orchestrator or return `awaiting_reply` (approval needed, AI off, contact opted out) |
+| POST | `/api/chat/messages` | Session token in the body (120/IP/min) | Poll the session's own persisted messages after a cursor and mark them delivered |
+| GET | `/api/widget/[businessId]` | None | Embeddable loader script (JavaScript) that opens `/chat-widget/[businessId]` |
+
+Public rate limits use the database (`consume_public_rate_limit()`) or Upstash when both Redis credentials are set, and fail closed when deployed.
 
 ### Conversations & Messages
 | Method | Route | Auth | Description |
@@ -214,6 +224,14 @@ Full audit trail of every AI decision.
 | GET/PUT | `/api/conversations/[id]` | getAPIContext | Fetch/update single |
 | GET | `/api/conversations/[id]/messages` | getAPIContext | Paginated messages |
 | POST | `/api/conversations/[id]/messages` | getAPIContext | Human reply |
+
+### Follow-ups & Today (2026-11-07)
+| Method | Route | Auth | Description |
+|--------|-------|------|-------------|
+| GET | `/api/follow-ups` | getAPIContext | List follow-ups (`contact_id`, `status` = pending / completed / all, default pending) |
+| POST | `/api/follow-ups` | getAPIContext, editors only | Create an assigned follow-up with a due date (stored in UTC) |
+| PATCH | `/api/follow-ups/[id]` | getAPIContext, editors only | Reschedule, snooze, reassign or complete; 409 if the row changed meanwhile |
+| GET | `/api/dashboard/today` | getAPIContext | Today queues for `/dashboard` in the business time zone (capped at 200, with truncation notices) |
 
 ### Bookings
 | Method | Route | Auth | Description |
